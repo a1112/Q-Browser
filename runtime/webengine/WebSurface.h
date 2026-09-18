@@ -42,6 +42,7 @@ public:
     [[nodiscard]] QString title() const;
     [[nodiscard]] int loadProgress() const noexcept;
     [[nodiscard]] bool isLoading() const noexcept;
+    [[nodiscard]] qint64 renderProcessIdForMonitoring() const noexcept;
 
 #ifdef Q_BROWSER_WEBENGINE_TESTING
     [[nodiscard]] QUrl currentUrl() const;

@@ -6,16 +6,29 @@
 #include <functional>
 
 class QLabel;
+class QComboBox;
 class QToolButton;
 class QTreeWidget;
 class QTimer;
 class PerformanceThread;
 class PerformanceHistory;
 
+struct TabResourceInfo {
+    QString id;
+    QString title;
+    QString address;
+    QString state;
+    QString attribution;
+    quint64 pid = 0;
+    quint64 creationTime = 0;
+    bool active = false;
+};
+
 struct BrowserResourceCounts {
     int tabs = 0;
     qsizetype webPages = 0;
     int workerSurfaces = 0;
+    QVector<TabResourceInfo> tabResources;
 };
 
 class PerformancePanel final : public QWidget {
@@ -36,6 +49,7 @@ private:
     void updateSampling();
     void stopSampling();
     void displaySample(const PerformanceSample &sample);
+    QString historyIdentity_;
     std::function<BrowserResourceCounts()> resources_;
     PerformanceThread *sampler_ = nullptr;
     QTimer *heartbeat_ = nullptr;
@@ -50,5 +64,8 @@ private:
     QLabel *status_ = nullptr;
     QToolButton *pause_ = nullptr;
     QTreeWidget *processes_ = nullptr;
+    QTreeWidget *tabs_ = nullptr;
+    QComboBox *scope_ = nullptr;
+    QLabel *attribution_ = nullptr;
     PerformanceHistory *history_ = nullptr;
 };

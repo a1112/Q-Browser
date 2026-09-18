@@ -17,6 +17,7 @@
 
 class CapabilityWorkerLane;
 class ClipboardBroker;
+class AudioBroker;
 class FileBroker;
 class FileDialogCoordinator;
 class FileDialogOperationToken;
@@ -105,7 +106,8 @@ public:
         const QString &storageDirectory,
         quintptr hostWindowId,
         QString *errorCode,
-        FileDialogCoordinator *fileDialogCoordinator);
+        FileDialogCoordinator *fileDialogCoordinator,
+        const QString &verifiedPackageDirectory = {});
     static void retire(std::shared_ptr<HostCapabilityRuntime> runtime) noexcept;
 
     [[nodiscard]] const TabCapabilityAuthority &authority() const noexcept;
@@ -193,6 +195,8 @@ private:
     std::unique_ptr<QtFileDialogBackend> fileBackend_;
     std::shared_ptr<UserGestureGrantStore> gestureGrants_;
     std::unique_ptr<ClipboardBroker> clipboard_;
+    std::unique_ptr<AudioBroker> audio_;
+    QString verifiedPackageDirectory_;
     std::unique_ptr<FileBroker> file_;
     std::unique_ptr<CapabilityBroker> guiBroker_;
     std::shared_ptr<PendingHostFileRequest> pendingFile_;

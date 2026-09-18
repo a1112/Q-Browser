@@ -138,11 +138,14 @@ public:
     [[nodiscard]] AppRuntimeResult installAndActivate(const QString &packagePath,
                                                        qint64 nowMs);
     [[nodiscard]] AppRuntimeResult startOffline(qint64 nowMs);
+    [[nodiscard]] AppRuntimeResult installSitePackage(const QString &path,
+                                                     const QString &packageId);
     [[nodiscard]] AppRuntimeResult requestTabLaunch(
         const TabLaunchAuthority &tab,
         const QString &route,
         TabLaunchIntent intent,
-        qint64 nowMs);
+        qint64 nowMs,
+        const QString &packageId = {});
     [[nodiscard]] AppRuntimeResult cancelPendingLaunch(
         const WorkerLaunchRequest &request);
 

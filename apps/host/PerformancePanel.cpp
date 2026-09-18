@@ -1,6 +1,8 @@
 #include "PerformancePanel.h"
 
 #include <QDateTime>
+#include <QComboBox>
+#include <QSignalBlocker>
 #include <QHeaderView>
 #include <QHideEvent>
 #include <QLabel>
@@ -119,7 +121,7 @@ PerformancePanel::PerformancePanel(std::function<BrowserResourceCounts()> resour
     setObjectName(QStringLiteral("performance-panel"));
     setAccessibleName(QStringLiteral("性能监测"));
     setFont(QFont(QStringLiteral("Microsoft YaHei UI"), 9));
-    setFixedWidth(320);
+    setFixedWidth(380);
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(14, 12, 14, 12);
     auto *heading = new QHBoxLayout;
@@ -156,6 +158,13 @@ PerformancePanel::PerformancePanel(std::function<BrowserResourceCounts()> resour
         return result;
     };
     label(QString(), QStringLiteral("Q-Browser 及其子进程 · 每秒采样"));
+    scope_ = new QComboBox(body);
+    scope_->setObjectName(QStringLiteral("performance-scope"));
+    scope_->setAccessibleName(QStringLiteral("监控范围"));
+    scope_->addItem(QStringLiteral("全部进程"), QStringLiteral("all"));
+    scope_->addItem(QStringLiteral("当前标签（跟随切换）"), QStringLiteral("active"));
+    content->addWidget(scope_);
+    attribution_ = label(QStringLiteral("performance-attribution"), QString());
     cpu_ = label(QStringLiteral("performance-cpu"), QStringLiteral("CPU  —"));
     memory_ = label(QStringLiteral("performance-memory"), QStringLiteral("内存  —"));
     for (auto *metric : {cpu_, memory_}) {
@@ -180,8 +189,32 @@ PerformancePanel::PerformancePanel(std::function<BrowserResourceCounts()> resour
     processes_->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
     processes_->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
     content->addWidget(processes_);
+    label(QString(), QStringLiteral("标签独立监控 · 双击一行查看趋势"));
+    tabs_ = new QTreeWidget(body);
+    tabs_->setObjectName(QStringLiteral("performance-tabs"));
+    tabs_->setAccessibleName(QStringLiteral("标签资源占用"));
+    tabs_->setHeaderLabels({QStringLiteral("标签 / 状态"), QStringLiteral("PID"), QStringLiteral("CPU"), QStringLiteral("内存")});
+    tabs_->setRootIsDecorated(false);
+    tabs_->setMinimumHeight(160);
+    tabs_->setMaximumHeight(230);
+    tabs_->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+    for (int column = 1; column < 4; ++column)
+        tabs_->header()->setSectionResizeMode(column, QHeaderView::ResizeToContents);
+    content->addWidget(tabs_);
+    connect(tabs_, &QTreeWidget::itemDoubleClicked, this, [this](QTreeWidgetItem *item) {
+        scope_->setCurrentIndex(scope_->findData(item->data(0, Qt::UserRole)));
+    });
     status_ = label(QStringLiteral("performance-status"), QStringLiteral("等待采样…"));
-    label(QString(), QStringLiteral("CPU 按全机逻辑核心归一化。内存为各进程工作集之和，共享页可能重复计数。趋势保留最近 60 次采样。"));
+    connect(scope_, &QComboBox::currentIndexChanged, this, [this] {
+        history_->clear();
+        historyIdentity_.clear();
+        cpu_->setText(QStringLiteral("CPU  —"));
+        memory_->setText(QStringLiteral("内存  —"));
+        details_->setText(QStringLiteral("专用提交  —"));
+        processes_->clear();
+        attribution_->setText(QStringLiteral("等待所选范围的新采样"));
+    });
+    label(QString(), QStringLiteral("CPU 按全机逻辑核心归一化。内存为工作集，共享页可能重复计数。标签指标不包含 Host 音频代理等公共服务；共享渲染进程不会按标签均摊。趋势保留最近 60 次采样。"));
     content->addStretch();
     scroll->setWidget(body);
     layout->addWidget(scroll, 1);
@@ -237,12 +270,72 @@ void PerformancePanel::updateSampling()
 }
 void PerformancePanel::displaySample(const PerformanceSample &sample)
 {
-    const bool valid = !sample.processes.isEmpty();
-    cpu_->setText(QStringLiteral("CPU  %1").arg(percent(sample.cpuPercent)));
-    memory_->setText(QStringLiteral("内存  %1").arg(valid ? megabytes(sample.workingSet) : QStringLiteral("—")));
-    details_->setText(QStringLiteral("专用提交  %1").arg(valid ? megabytes(sample.privateBytes) : QStringLiteral("—")));
-    history_->append(sample.cpuPercent, valid ? double(sample.workingSet) / (1024 * 1024) : -1);
     const auto counts = resources_();
+    QString selected = scope_->currentData().toString();
+    bool choicesChanged = scope_->count() != counts.tabResources.size() + 2;
+    for (qsizetype index = 0; !choicesChanged && index < counts.tabResources.size(); ++index) {
+        const auto &tab = counts.tabResources[index];
+        choicesChanged = scope_->itemData(int(index) + 2).toString() != tab.id
+            || scope_->itemText(int(index) + 2) != tab.title;
+    }
+    if (choicesChanged) {
+        QSignalBlocker blocker(scope_);
+        scope_->clear();
+        scope_->addItem(QStringLiteral("全部进程"), QStringLiteral("all"));
+        scope_->addItem(QStringLiteral("当前标签（跟随切换）"), QStringLiteral("active"));
+        for (const auto &tab : counts.tabResources) scope_->addItem(tab.title, tab.id);
+        int index = scope_->findData(selected);
+        if (index < 0) { index = 1; selected = QStringLiteral("active"); }
+        scope_->setCurrentIndex(index);
+    }
+    const auto usageFor = [&sample](const TabResourceInfo &tab) -> const ProcessUsage * {
+        if (!tab.pid) return nullptr;
+        for (const auto &usage : sample.processes)
+            if (usage.counters.pid == tab.pid
+                && (!tab.creationTime || usage.counters.creationTime == tab.creationTime)) return &usage;
+        return nullptr;
+    };
+    QHash<quint64, int> owners;
+    for (const auto &tab : counts.tabResources) if (tab.pid) ++owners[tab.pid];
+    const TabResourceInfo *selectedTab = nullptr;
+    tabs_->clear();
+    for (const auto &tab : counts.tabResources) {
+        const auto *usage = usageFor(tab);
+        const QString sharing = owners.value(tab.pid) > 1 ? QStringLiteral(" · 共享进程") : QString();
+        auto *row = new QTreeWidgetItem(tabs_, {tab.title + QStringLiteral(" · ") + tab.state + sharing,
+            tab.pid ? QString::number(tab.pid) : QStringLiteral("—"),
+            usage ? percent(usage->cpuPercent) : QStringLiteral("—"),
+            usage ? megabytes(usage->counters.workingSet) : QStringLiteral("—")});
+        row->setData(0, Qt::UserRole, tab.id);
+        row->setToolTip(0, tab.title + u'\n' + tab.address + u'\n' + tab.attribution + sharing);
+        if (selected == tab.id || (selected == QStringLiteral("active") && tab.active)) selectedTab = &tab;
+    }
+    PerformanceSample visible = sample;
+    QString identity = QStringLiteral("all");
+    attribution_->setText(QStringLiteral("整个浏览器进程树（包含公共服务）"));
+    if (selected != QStringLiteral("all")) {
+        visible = {};
+        identity = selectedTab ? selectedTab->id + u':' + QString::number(selectedTab->pid)
+            + u':' + QString::number(selectedTab->creationTime) : QStringLiteral("none");
+        attribution_->setText(selectedTab ? selectedTab->title + u'\n' + selectedTab->attribution
+            + (owners.value(selectedTab->pid) > 1 ? QStringLiteral("\n此进程被多个标签共享，显示整个进程占用") : QString())
+            : QStringLiteral("当前没有可监控标签"));
+        if (selectedTab) {
+            if (const auto *usage = usageFor(*selectedTab)) {
+                visible.processes.append(*usage);
+                visible.cpuPercent = usage->cpuPercent;
+                visible.workingSet = usage->counters.workingSet;
+                visible.privateBytes = usage->counters.privateBytes;
+                identity += u':' + QString::number(usage->counters.creationTime);
+            }
+        }
+    }
+    if (historyIdentity_ != identity) { history_->clear(); historyIdentity_ = identity; }
+    const bool valid = !visible.processes.isEmpty();
+    cpu_->setText(QStringLiteral("CPU  %1").arg(percent(visible.cpuPercent)));
+    memory_->setText(QStringLiteral("内存  %1").arg(valid ? megabytes(visible.workingSet) : QStringLiteral("—")));
+    details_->setText(QStringLiteral("专用提交  %1").arg(valid ? megabytes(visible.privateBytes) : QStringLiteral("—")));
+    history_->append(visible.cpuPercent, valid ? double(visible.workingSet) / (1024 * 1024) : -1);
     resourcesLabel_->setText(QStringLiteral("%1 个标签页  ·  %2 个网页实例\n%3 个 Worker 视图  ·  %4 个可读进程")
         .arg(counts.tabs).arg(counts.webPages).arg(counts.workerSurfaces).arg(sample.processes.size()));
     // Include a late heartbeat that is still queued behind this delivery.
@@ -250,7 +343,7 @@ void PerformancePanel::displaySample(const PerformanceSample &sample)
     latency_->setText(QStringLiteral("界面延迟  %1 ms").arg(maximumDelay_));
     maximumDelay_ = 0;
     processes_->clear();
-    for (const auto &usage : sample.processes) {
+    for (const auto &usage : visible.processes) {
         auto *item = new QTreeWidgetItem(processes_, {usage.counters.name,
             percent(usage.cpuPercent), megabytes(usage.counters.workingSet)});
         item->setToolTip(0, QStringLiteral("%1\nPID %2 · 父进程 %3\n专用提交 %4")

@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/KDE/elisa",
+  "tag": "v26.08.1",
+  "commit": "536761f05b603a1763a2c613ae3b5d5f9ddde696",
+  "files": [
+    {
+      "upstream": "src/qml/TrackBrowserDelegate.qml",
+      "file": "qml/TrackBrowserDelegate.qml",
+      "sha256": "5aa3aa7419d3160b78a5b1c60685d52ab6bf7663cd72570b4499ac854bf9defa"
+    }
+  ]
+}

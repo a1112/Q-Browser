@@ -7,6 +7,8 @@ param(
     [string]$KeyDirectory = '',
     [string]$TrustedRoot = '',
     [string]$SourceDirectory = '',
+    [ValidateSet('pilot', 'elisa', 'tokodon', 'coffee')]
+    [string]$PackageName = 'pilot',
     [switch]$ParentTrustedRootLeaseHeld,
     [switch]$Clean
 )
@@ -87,7 +89,8 @@ if ([string]::IsNullOrWhiteSpace($TrustedRoot)) {
 $trusted = [IO.Path]::GetFullPath($TrustedRoot)
 $trustedBuildRoot = Join-Path $trusted 'build'
 $trustedWorkRoot = Join-Path $trusted 'work'
-$defaultOutput = [IO.Path]::GetFullPath((Join-Path $trusted 'release-package'))
+$outputName = if ($PackageName -eq 'pilot') { 'release-package' } else { "release-package-$PackageName" }
+$defaultOutput = [IO.Path]::GetFullPath((Join-Path $trusted $outputName))
 $defaultKeys = [IO.Path]::GetFullPath((Join-Path $trusted 'signing'))
 if ([string]::IsNullOrWhiteSpace($BuildDirectory)) {
     $BuildDirectory = Join-Path $trustedBuildRoot 'release'
@@ -358,7 +361,7 @@ function Assert-PlainTree([string]$Path) {
 }
 
 $script:leases = [Collections.Generic.List[IDisposable]]::new()
-Assert-TrustedAncestorChain $localAppData
+Assert-TrustedAncestorChain (Split-Path -Parent $trusted)
 Assert-NoReparseAncestor $trusted
 New-Item -ItemType Directory -Path $trusted -Force | Out-Null
 foreach ($managedParent in @($trustedBuildRoot, $trustedWorkRoot)) {
@@ -430,8 +433,14 @@ $temporaryLease = $null
 $temporaryIdentity = Get-PathIdentity $temporaryRoot
 $buildRootIdentity = Get-PathIdentity $trustedWorkRoot
 try {
-    $sourceInput = Join-Path $sourceRoot 'packages\pilot'
+    $sourceInput = Join-Path $sourceRoot "packages\$PackageName"
     Assert-PlainTree $sourceInput
+    $packageManifest = Get-Content -LiteralPath (Join-Path $sourceInput 'manifest.json') -Raw | ConvertFrom-Json
+    $expectedId = if ($PackageName -eq 'pilot') { 'com.qbrowser.pilot' } else { "com.qbrowser.demo.$PackageName" }
+    if ($packageManifest.appId -ne $expectedId -or $packageManifest.version -ne '1.0.0') {
+        throw 'Unexpected demo package identity or version.'
+    }
+    $packageFileName = "$expectedId-1.0.0.qapkg"
     $source = Join-Path $temporaryRoot 'pilot-source'
     New-Item -ItemType Directory -Path $source | Out-Null
     foreach ($entry in Get-ChildItem -LiteralPath $sourceInput -Force -Recurse) {
@@ -449,7 +458,7 @@ try {
     Assert-StableTrustedPath $temporaryRoot $temporaryIdentity
     $unsignedOne = Join-Path $temporaryRoot 'pilot-1.unsigned.qapkg'
     $unsignedTwo = Join-Path $temporaryRoot 'pilot-2.unsigned.qapkg'
-    $signedOne = Join-Path $temporaryRoot 'com.qbrowser.pilot-1.0.0.qapkg'
+    $signedOne = Join-Path $temporaryRoot $packageFileName
     $signedTwo = Join-Path $temporaryRoot 'pilot-2.signed.qapkg'
     Invoke-Checked $packageCli @('pack', '--source', $source, '--output', $unsignedOne)
     Invoke-Checked $packageCli @('pack', '--source', $source, '--output', $unsignedTwo)
@@ -484,14 +493,14 @@ try {
     $inspectionText = & $packageCli inspect --package $signedOne --public-key $publicKey
     if ($LASTEXITCODE -ne 0) { throw 'Signed Pilot inspection failed.' }
     $inspection = $inspectionText | ConvertFrom-Json
-    if (-not $inspection.verified -or $inspection.appId -ne 'com.qbrowser.pilot' -or
+    if (-not $inspection.verified -or $inspection.appId -ne $expectedId -or
         $inspection.version -ne '1.0.0') {
         throw 'Signed Pilot inspection returned an unexpected identity.'
     }
     $keyLease = Add-DirectoryLease $keys
     Assert-StableTrustedPath $keys $keyIdentity
 
-    $publishedPackage = Join-Path $output 'com.qbrowser.pilot-1.0.0.qapkg'
+    $publishedPackage = Join-Path $output $packageFileName
     $publishedPublicKey = Join-Path $output 'dev-public.pem'
     if (Test-Path -LiteralPath $output) {
         if ($Clean) {

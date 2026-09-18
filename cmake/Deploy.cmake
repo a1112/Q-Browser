@@ -82,7 +82,7 @@ if(Q_BROWSER_DEPLOY_MODE STREQUAL "ASSEMBLE")
     list(APPEND host_webengine_arguments
       -webenginecore -webenginequick -webenginewidgets)
   endif()
-  execute_process(COMMAND "${windeployqt}" --release --force
+  execute_process(COMMAND "${windeployqt}" --release
     --compiler-runtime --force-openssl --skip-plugin-types qmltooling
     --exclude-plugins qtposition_nmea --translations en
     --qmldir "${Q_BROWSER_REPO_ROOT}/qml" ${host_webengine_arguments}
@@ -101,10 +101,10 @@ if(Q_BROWSER_DEPLOY_MODE STREQUAL "ASSEMBLE")
     file(COPY_FILE "${Q_BROWSER_QT_ROOT}/bin/${host_qt_runtime}"
       "${host_directory}/${host_qt_runtime}" ONLY_IF_DIFFERENT)
   endforeach()
-  execute_process(COMMAND "${windeployqt}" --release --force
+  execute_process(COMMAND "${windeployqt}" --release
     --compiler-runtime --force-openssl --skip-plugin-types qmltooling
     --exclude-plugins qtposition_nmea --translations en
-    --qmldir "${Q_BROWSER_REPO_ROOT}/qml"
+    --qmldir "${Q_BROWSER_REPO_ROOT}/packages"
     --no-webenginecore --no-webenginequick --no-webenginewidgets
     --dir "${runtime_directory}" "${runtime_directory}/qbrowser-worker.exe"
     RESULT_VARIABLE worker_deploy_result OUTPUT_VARIABLE worker_deploy_output
@@ -154,6 +154,10 @@ if(Q_BROWSER_DEPLOY_MODE STREQUAL "ASSEMBLE")
   file(WRITE "${Q_BROWSER_DEPLOY_DIR}/SHA-256SUMS" "${generated_inventory}")
   message(STATUS "Q-Browser deployment assembled: ${Q_BROWSER_DEPLOY_DIR}")
   return()
+elseif(Q_BROWSER_DEPLOY_MODE STREQUAL "SEAL_DEVELOPMENT")
+  q_browser_canonical_inventory(generated_inventory)
+  file(WRITE "${Q_BROWSER_DEPLOY_DIR}/SHA-256SUMS" "${generated_inventory}")
+  set(require_attestation FALSE)
 elseif(Q_BROWSER_DEPLOY_MODE STREQUAL "SEAL")
   q_browser_require_file("release-attestation.json")
   q_browser_canonical_inventory(generated_inventory)
@@ -310,13 +314,17 @@ foreach(runtime_subdirectory IN ITEMS host runtime)
   endforeach()
 endforeach()
 q_browser_require_file("host/Qt6WebEngineCore.dll")
+q_browser_require_file("host/Qt6Multimedia.dll")
+q_browser_require_glob("Host audio backend" "host/multimedia/*mediaplugin.dll")
 q_browser_require_file("host/Qt6WebChannelQuick.dll")
 q_browser_require_file("host/QtWebEngineProcess.exe")
 file(GLOB_RECURSE forbidden_worker_webengine LIST_DIRECTORIES false
   "${Q_BROWSER_DEPLOY_DIR}/runtime/*WebEngine*"
-  "${Q_BROWSER_DEPLOY_DIR}/runtime/*webengine*")
+  "${Q_BROWSER_DEPLOY_DIR}/runtime/*webengine*"
+  "${Q_BROWSER_DEPLOY_DIR}/runtime/*Multimedia*"
+  "${Q_BROWSER_DEPLOY_DIR}/runtime/*mediaplugin*")
 if(forbidden_worker_webengine)
-  q_browser_deploy_fail("Worker closure contains forbidden WebEngine assets")
+  q_browser_deploy_fail("Worker closure contains forbidden WebEngine or Multimedia assets")
 endif()
 
 execute_process(COMMAND "${CMAKE_COMMAND}" -E env
@@ -436,7 +444,8 @@ function Get-PeImports([string]$path) {
 $missing = [Collections.Generic.List[string]]::new()
 $osDlls = [Collections.Generic.HashSet[string]]::new(
   [StringComparer]::OrdinalIgnoreCase)
-foreach ($name in @('advapi32.dll','authz.dll','bcrypt.dll','bthprops.cpl',
+foreach ($name in @('advapi32.dll','authz.dll','avrt.dll','bcrypt.dll','bthprops.cpl',
+  'cabinet.dll','msi.dll','wininet.dll','dxva2.dll','evr.dll',
   'cfgmgr32.dll','comctl32.dll','comdlg32.dll','crypt32.dll','cryptbase.dll',
   'd3d9.dll','d3d11.dll','d3d12.dll','dcomp.dll','dbghelp.dll','dhcpcsvc.dll',
   'dnsapi.dll','dwrite.dll','dwmapi.dll','dxgi.dll','fontsub.dll','gdi32.dll',

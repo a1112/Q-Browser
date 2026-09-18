@@ -24,15 +24,18 @@ struct DemoInfo {
     QString tags;
     QColor accent;
 };
-const std::array<DemoInfo, 6> &demos()
+const std::array<DemoInfo, 9> &demos()
 {
-    static const std::array<DemoInfo, 6> entries{{
+    static const std::array<DemoInfo, 9> entries{{
         {"widgets", QStringLiteral("控件实验室"), QStringLiteral("组合表单、滑块与进度反馈，实时预览你的设置。"), QStringLiteral("基础控件"), QStringLiteral("Widgets · 表单 · 状态"), QColor("#38b99a")},
         {"table", QStringLiteral("数据探索"), QStringLiteral("搜索、筛选和排序订单，体验桌面级数据表格。"), QStringLiteral("数据展示"), QStringLiteral("Model / View · 筛选"), QColor("#6485ef")},
         {"charts", QStringLiteral("图表工作台"), QStringLiteral("切换折线与柱状图，观察不同数据集的变化。"), QStringLiteral("数据展示"), QStringLiteral("QPainter · 可视化"), QColor("#b18aeb")},
         {"animation", QStringLiteral("动效实验室"), QStringLiteral("比较三种缓动曲线，调整速度、暂停并重新播放。"), QStringLiteral("交互体验"), QStringLiteral("Animation · 缓动"), QColor("#ebaa51")},
         {"kanban", QStringLiteral("轻量任务看板"), QStringLiteral("添加任务，在三列之间拖放卡片，组织一天的工作。"), QStringLiteral("交互体验"), QStringLiteral("Drag & Drop · 看板"), QColor("#e58ca5")},
         {"canvas", QStringLiteral("创意画布"), QStringLiteral("选择颜色和笔宽，自由绘制属于你的第一张草图。"), QStringLiteral("交互体验"), QStringLiteral("Canvas · 鼠标交互"), QColor("#54b9d0")},
+        {"elisa", QStringLiteral("Elisa 音乐"), QStringLiteral("KDE Elisa 26.08.1 精简移植：专辑、播放队列与真实音频。"), QStringLiteral("QML 应用"), QStringLiteral("QML · LGPL-3.0-or-later · 独立 Worker"), QColor("#45a9d5")},
+        {"tokodon", QStringLiteral("Tokodon 社区"), QStringLiteral("KDE Tokodon 26.08.1 精简移植：本地信息流、互动与发帖。"), QStringLiteral("QML 应用"), QStringLiteral("QML · GPL-3.0 · 会话内模拟"), QColor("#7767dc")},
+        {"coffee", QStringLiteral("Coffee Machine"), QStringLiteral("Qt 6.11.0 咖啡机移植：选择饮品、调整配方与制作动画。"), QStringLiteral("QML 应用"), QStringLiteral("QML · BSD-3-Clause · 无设备连接"), QColor("#b99464")},
     }};
     return entries;
 }
@@ -156,7 +159,7 @@ DemoGallery::DemoGallery(QWidget *parent) : QWidget(parent)
     category_ = new QComboBox(catalogContent);
     category_->setObjectName(QStringLiteral("demo-category"));
     category_->setAccessibleName(QStringLiteral("示例分类"));
-    category_->addItems({QStringLiteral("全部示例"), QStringLiteral("基础控件"), QStringLiteral("数据展示"), QStringLiteral("交互体验")});
+    category_->addItems({QStringLiteral("全部示例"), QStringLiteral("基础控件"), QStringLiteral("数据展示"), QStringLiteral("交互体验"), QStringLiteral("QML 应用")});
     toolbar->addWidget(search_, 1);
     toolbar->addWidget(category_);
     catalogLayout->addLayout(toolbar);
@@ -179,7 +182,7 @@ DemoGallery::DemoGallery(QWidget *parent) : QWidget(parent)
         auto *layout = new QVBoxLayout(card);
         layout->setContentsMargins(16, 16, 16, 16);
         layout->setSpacing(10);
-        layout->addWidget(new DemoPreview(i, info.accent, card));
+        layout->addWidget(new DemoPreview(i < 6 ? i : i - 6, info.accent, card));
         layout->addWidget(label(info.title, QStringLiteral("demo-card-title"), card));
         auto *description = label(info.description, QStringLiteral("demo-card-description"), card);
         description->setMinimumHeight(42);
@@ -276,6 +279,19 @@ bool DemoGallery::openDemo(const QString &id)
 {
     for (const auto &info : demos()) {
         if (id != QString::fromLatin1(info.id)) continue;
+        if (info.category == QStringLiteral("QML 应用")) {
+            if (packageRuntimeEnabled_) {
+                emit routeRequested(QStringLiteral("app://pilot/demos/") + id);
+                return true;
+            }
+            delete example_;
+            example_ = label(QStringLiteral("当前为可信外壳模式。请运行 scripts/start-qml-demos.ps1 准备签名包与 Worker 环境后体验。"), QStringLiteral("demo-runtime-status"), detail_);
+            detailTitle_->setText(info.title);
+            detailDescription_->setText(info.description + QStringLiteral("\n") + info.tags);
+            detailLayout_->addWidget(example_, 1);
+            pages_->setCurrentIndex(1);
+            return true;
+        }
         QWidget *const candidate = createDemoExample(id, detail_);
         if (candidate == nullptr) return false;
         delete example_;
@@ -295,4 +311,14 @@ void DemoGallery::showGallery()
     pages_->setCurrentIndex(0);
     delete example_;
     example_ = nullptr;
+}
+
+void DemoGallery::setPackageRuntimeEnabled(bool enabled)
+{
+    packageRuntimeEnabled_ = enabled;
+    for (int i = 6; i < 9; ++i) {
+        auto *button = cards_.at(i)->findChild<QPushButton *>();
+        if (button) button->setText(enabled ? QStringLiteral("启动独立应用  →")
+                                           : QStringLiteral("查看运行环境说明  →"));
+    }
 }

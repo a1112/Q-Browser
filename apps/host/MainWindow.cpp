@@ -1,4 +1,6 @@
 #include "MainWindow.h"
+#include "NewTabPage.h"
+#include "DemoRoutes.h"
 
 #include "AppTabRuntimeController.h"
 #include "BrowserAddress.h"
@@ -99,8 +101,41 @@ MainWindow::MainWindow(RouteRegistry routeRegistry,
         for (auto *controller : controllers_) {
             if (controller->workerSurface()) ++workers;
         }
-        return BrowserResourceCounts{tabModel_->count(),
-            webSessionProfile_->registeredPageCount(), workers};
+        BrowserResourceCounts result{tabModel_->count(),
+            webSessionProfile_->registeredPageCount(), workers, {}};
+        for (const auto &snapshot : tabModel_->snapshots()) {
+            auto *controller = tabController(snapshot.id);
+            if (!controller) continue;
+            TabResourceInfo info;
+            info.id = snapshot.id;
+            info.title = snapshot.title;
+            info.address = snapshot.address;
+            info.active = controller->isActive();
+            switch (controller->lifecycle()) {
+            case BrowserTabLifecycle::Dormant: info.state = QStringLiteral("未启动"); break;
+            case BrowserTabLifecycle::Starting: info.state = QStringLiteral("启动中"); break;
+            case BrowserTabLifecycle::Loading: info.state = QStringLiteral("加载中"); break;
+            case BrowserTabLifecycle::Active: info.state = QStringLiteral("前台"); break;
+            case BrowserTabLifecycle::Background: info.state = QStringLiteral("后台"); break;
+            case BrowserTabLifecycle::TrustedError: info.state = QStringLiteral("错误"); break;
+            case BrowserTabLifecycle::Closing: info.state = QStringLiteral("关闭中"); break;
+            case BrowserTabLifecycle::Retired: info.state = QStringLiteral("已回收"); break;
+            }
+            if (auto *worker = controller->workerSurface()) {
+                info.pid = worker->processIdForMonitoring();
+                info.creationTime = worker->processCreationTimeForMonitoring();
+                info.attribution = QStringLiteral("独立 Worker · %1").arg(controller->workerPackageId());
+            } else if (auto *web = controller->webSurface()) {
+                info.pid = quint64(qMax(qint64(0), web->renderProcessIdForMonitoring()));
+                info.attribution = QStringLiteral("主框架渲染进程；子框架和浏览器公共服务未计入");
+            } else {
+                info.attribution = snapshot.kind == BrowserTabKind::Host
+                    ? QStringLiteral("Host 共享界面，无法单独拆分 CPU 与内存")
+                    : QStringLiteral("尚无可采样进程");
+            }
+            result.tabResources.append(info);
+        }
+        return result;
     }, central);
     content->addWidget(performance);
     performance->hide();
@@ -547,6 +582,9 @@ bool MainWindow::navigateFromWorker(const QString &stableId,
         || route.startsWith(QStringLiteral("//"))) {
         return false;
     }
+    if (route == QStringLiteral("/__demo_gallery") && isQmlDemoPackage(packageId)) {
+        return navigateTab(stableId, QStringLiteral("qbrowser://newtab"));
+    }
     const QString candidate = QStringLiteral("app://pilot") + route;
     const BrowserAddress parsed = BrowserAddress::parse(candidate);
     if (!parsed.isValid() || parsed.kind() != BrowserAddressKind::App) {
@@ -914,6 +952,10 @@ std::optional<MainWindow::ResolvedNavigation> MainWindow::resolveAddress(
 
     const RouteMatch match = routes_.match(parsed.appPath());
     if (!match.isValid()) return fail(QStringLiteral("Route not found."));
+    if (parsed.canonical().startsWith(QStringLiteral("http"))
+        && !isQmlDemoRoute(match.record.packageId, parsed.appPath())) {
+        return fail(QStringLiteral("此 HTTP 地址未绑定到已支持的 QML 应用路由。"));
+    }
     ResolvedNavigation resolved;
     resolved.canonicalAddress = parsed.canonical();
     resolved.appRoute = parsed.appPath();
@@ -1124,11 +1166,29 @@ bool MainWindow::startResolved(const QString &stableTabId,
     controller->setActive(activeStableId() == stableTabId);
     switch (resolved.kind) {
     case BrowserTabKind::Host:
-        return controller->startHost(navigationIncarnation);
+    {
+        const bool packageRuntimeEnabled = packageRuntimeEnabled_;
+        const QPointer<TabController> hostController(controller);
+        const bool started = controller->startHost(navigationIncarnation);
+        if (started && hostController && hostController->hostSurface())
+            hostController->hostSurface()->setPackageRuntimeEnabled(packageRuntimeEnabled);
+        return started;
+    }
     case BrowserTabKind::Web:
         return controller->startWeb(
             resolved.physicalEntry, navigationIncarnation, reloadExisting);
     case BrowserTabKind::App:
+        if (resolved.canonicalAddress.startsWith(QStringLiteral("http"))) {
+            if (!packageRuntimeEnabled_) {
+                controller->showTrustedErrorForNavigation(navigationIncarnation,
+                    QStringLiteral("HTTP QML 网站需要签名包运行环境，请以 package 模式启动。"));
+                return false;
+            }
+            if (!controller->prepareAppLaunch(resolved.packageId, navigationIncarnation)) return false;
+            emit appLaunchRequested(stableTabId, navigationIncarnation,
+                                    resolved.packageId, resolved.appRoute);
+            return true;
+        }
         if (packageRuntimeEnabled_ && legacyWorkerOwnerId_ != stableTabId) {
             if (!reloadExisting && controller->appRuntimeController() != nullptr
                 && controller->appRuntimeController()->hasWorkerContext()

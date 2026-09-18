@@ -2,6 +2,8 @@
 
 #include <QDir>
 #include <QFileInfo>
+#include <QFile>
+#include <cstdio>
 
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
@@ -10,10 +12,11 @@
 #endif
 
 std::shared_ptr<const HostOwnedFileAuthority> HostOwnedFileAuthority::open(
-    const QString &path)
+    const QString &path, const bool sharedParent)
 {
 #ifndef Q_OS_WIN
     Q_UNUSED(path);
+    Q_UNUSED(sharedParent);
     return {};
 #else
     const QFileInfo supplied(path);
@@ -28,15 +31,28 @@ std::shared_ptr<const HostOwnedFileAuthority> HostOwnedFileAuthority::open(
         new HostOwnedFileAuthority);
     authority->canonicalPath_ = QDir::cleanPath(canonical);
     authority->parentCanonicalPath_ = QDir::cleanPath(parent);
-    if (!authority->parentTree_.openRoot(supplied.absolutePath())
-        || !authority->parentTree_.rootHasRestrictedTrustAcl()
-        || !authority->parentTree_.isSameRootIdentityAt(
-            authority->parentCanonicalPath_)
-        || !authority->file_.openReadLocked(path, authority->parentTree_)
-        || !authority->file_.hasRestrictedTrustAcl()
-        || !authority->file_.hasSingleLink()
-        || !authority->file_.isSameIdentityAt(authority->canonicalPath_)
-        || !authority->file_.isStableWithin(authority->parentTree_)) {
+    const auto checked = [](bool valid, const char *stage) {
+        if (!valid && qEnvironmentVariableIsSet("Q_BROWSER_HOST_DIAGNOSTIC_PHASES")) {
+            const auto nativeError = GetLastError();
+            QFile output;
+            if (output.open(stderr, QIODevice::WriteOnly, QFileDevice::DontCloseHandle)) {
+                (void)output.write(QByteArrayLiteral("qbrowser-host file authority: ") + stage
+                                  + " native=" + QByteArray::number(nativeError) + '\n');
+                (void)output.flush();
+            }
+        }
+        return valid;
+    };
+    if (!checked(sharedParent ? authority->parentTree_.openSharedRoot(supplied.absolutePath())
+                              : authority->parentTree_.openRoot(supplied.absolutePath()), "parent-open")
+        || !checked(authority->parentTree_.rootHasRestrictedTrustAcl(), "parent-acl")
+        || !checked(authority->parentTree_.isSameRootIdentityAt(
+            authority->parentCanonicalPath_), "parent-identity")
+        || !checked(authority->file_.openReadLocked(path, authority->parentTree_), "file-open")
+        || !checked(authority->file_.hasRestrictedTrustAcl(), "file-acl")
+        || !checked(authority->file_.hasSingleLink(), "file-links")
+        || !checked(authority->file_.isSameIdentityAt(authority->canonicalPath_), "file-identity")
+        || !checked(authority->file_.isStableWithin(authority->parentTree_), "file-stability")) {
         return {};
     }
     return authority;

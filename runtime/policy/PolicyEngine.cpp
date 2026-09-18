@@ -6,6 +6,7 @@ EffectivePolicy PolicyEngine::intersect(const ManifestPermissions &manifest,
                                         const HostPolicy &host)
 {
     EffectivePolicy effective;
+    effective.audioPlayback = manifest.audioPlayback && host.audioPlayback;
 
     if (!manifest.network.hosts.isEmpty() && !manifest.network.methods.isEmpty()
         && host.network.has_value()) {

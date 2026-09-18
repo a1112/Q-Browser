@@ -136,6 +136,7 @@ struct VerifiedPackageLease final
             && left.permissions.clipboardRead
                    == right.permissions.clipboardRead
             && left.permissions.fileOpen == right.permissions.fileOpen
+            && left.permissions.audioPlayback == right.permissions.audioPlayback
             && left.digestHex == right.digestHex
             && left.activationGenerationAtIssue
                    == right.activationGenerationAtIssue
@@ -150,6 +151,7 @@ struct InstallPolicy final
     QSet<QString> allowedImports;
     std::function<bool(const Manifest &, const QString &)> preflight;
     ArchiveLimits archiveLimits;
+    QSet<QString> allowedAppIds;
 };
 
 class PackageInstaller final
@@ -159,7 +161,8 @@ public:
                      QByteArray trustedPublicKeyPem,
                      InstallPolicy policy);
 
-    [[nodiscard]] InstallResult install(const QString &packagePath) const;
+    [[nodiscard]] InstallResult install(const QString &packagePath,
+                                        const QString &requiredAppId = {}) const;
     [[nodiscard]] InstallResult verifyInstalled(
         const QString &appId,
         const QString &versionDirectory) const;

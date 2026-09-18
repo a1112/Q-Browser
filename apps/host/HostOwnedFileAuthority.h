@@ -13,7 +13,7 @@ class HostOwnedFileAuthority final
 {
 public:
     [[nodiscard]] static std::shared_ptr<const HostOwnedFileAuthority> open(
-        const QString &path);
+        const QString &path, bool sharedParent = false);
     [[nodiscard]] static std::shared_ptr<const HostOwnedFileAuthority>
     openCurrentProcessExecutable();
 

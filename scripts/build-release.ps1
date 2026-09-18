@@ -8,6 +8,8 @@ param(
     [string]$TrustedRoot = '',
     [switch]$Clean,
     [bool]$RunAcceptance = $true,
+    [switch]$IncludeQmlDemos,
+    [switch]$DevelopmentOnly,
     [string]$PrepareManualState = '',
     [ValidateSet('', 'BeforePublish')]
     [string]$FailureInjection = ''
@@ -15,6 +17,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+$previousVcInstallDir = [Environment]::GetEnvironmentVariable('VCINSTALLDIR', 'Process')
 
 if (-not ('QBrowser.Task18.FileIdentity' -as [type])) {
     Add-Type -TypeDefinition @'
@@ -1020,7 +1023,7 @@ function New-TrustedSourceSnapshot([string]$Destination) {
     New-OwnedDirectory $Destination
     Protect-Path $Destination -Container
     $lease = New-DirectoryLease $Destination
-    $files = @(& git -C $repo ls-files)
+    $files = @(& git -C $repo ls-files --cached --others --exclude-standard)
     if ($LASTEXITCODE -ne 0 -or $files.Count -eq 0) {
         throw 'Unable to enumerate tracked Release source inputs.'
     }
@@ -1120,7 +1123,8 @@ if ($Clean -and
 }
 
 $deployScript = Join-Path $trustedControlRoot 'Deploy.cmake'
-if ((Test-Path -LiteralPath $deployment) -and -not $Clean) {
+if ((Test-Path -LiteralPath $deployment) -and -not $Clean -and
+    [string]::IsNullOrWhiteSpace($PrepareManualState)) {
     # Verification of an authoritative release is deliberately read-only. In
     # particular, do not call Protect-Path/icacls here: an already accepted
     # deployment must either pass exactly as published or fail closed.
@@ -1140,7 +1144,8 @@ if ((Test-Path -LiteralPath $deployment) -and -not $Clean) {
     $verifierBefore = "$(Get-PathIdentity $deployScript)|" +
         "$(Get-RawSecurityDescriptorHex $deployScript)|" +
         (Get-FileHash -Algorithm SHA256 -LiteralPath $deployScript).Hash
-    Invoke-Checked $CMake @('-DQ_BROWSER_DEPLOY_MODE=VERIFY',
+    $existingVerification = if ($DevelopmentOnly) { 'PREVERIFY' } else { 'VERIFY' }
+    Invoke-Checked $CMake @("-DQ_BROWSER_DEPLOY_MODE=$existingVerification",
         "-DQ_BROWSER_DEPLOY_DIR=$deployment", '-P', $deployScript)
     $after = Get-DeploymentSnapshot $deployment
     $verifierAfter = "$(Get-PathIdentity $deployScript)|" +
@@ -1155,7 +1160,7 @@ if ((Test-Path -LiteralPath $deployment) -and -not $Clean) {
     return
 }
 
-Assert-TrustedAncestorChain $localAppData
+Assert-TrustedAncestorChain (Split-Path -Parent $trusted)
 Assert-NoReparseAncestor $trusted
 New-Item -ItemType Directory -Path $trusted -Force | Out-Null
 [void](New-DirectoryLease $trusted)
@@ -1200,7 +1205,7 @@ if ($Clean) {
     Remove-OwnedTree $packageOutput $packageOutput
     Remove-OwnedTree $sourceStage $sourceStage
 }
-elseif (Test-Path -LiteralPath $build) {
+elseif ((Test-Path -LiteralPath $build) -and -not $DevelopmentOnly) {
     throw "Build output already exists; inspect it before using -Clean: $build"
 }
 
@@ -2462,7 +2467,14 @@ $buildParentIdentity = Get-PathIdentity $trustedBuildRoot
     Write-Output "TRUSTED_SOURCE_SNAPSHOT=PASS files=$($sourceSnapshot.Count)"
     Test-CleanupReparseDefense
     Test-TrustedParentReplacementDefense
-    New-OwnedDirectory $build
+    if (!(Test-Path -LiteralPath $build)) { New-OwnedDirectory $build }
+    else {
+        Assert-ProtectedPath $build -Container
+        Assert-PlainTree $build
+        if ([IO.File]::ReadAllText((Join-Path $build $ownedMarkerName)) -ne $ownedMarkerText) {
+            throw 'Development build ownership marker mismatch.'
+        }
+    }
     Protect-Path $build -Container
     # CMake must enter this leaf, so its protected/deny-delete-leased parent is
     # the operation barrier; the leaf identity and tree are checked around every
@@ -2490,11 +2502,19 @@ $buildParentIdentity = Get-PathIdentity $trustedBuildRoot
     Assert-PlainTree $build
     Assert-StableTrustedPath $build $buildIdentity
     Write-Output 'BUILD_INPUT_TAMPER_DEFENSE=PASS acl=rejected reparse=rejected'
+    $env:PATH = "$(Join-Path $QtRoot 'bin');$(Join-Path $OpenSslRoot 'bin');$previousPath"
+    if ([string]::IsNullOrWhiteSpace($env:VCINSTALLDIR)) {
+        $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+        if (Test-Path -LiteralPath $vswhere) {
+            $vsRoot = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+            if ($vsRoot) { $env:VCINSTALLDIR = Join-Path $vsRoot 'VC' }
+        }
+    }
     Invoke-Checked $CMake @('-S', $sourceStage, '-B', $build,
         '-G', 'Visual Studio 17 2022', '-A', 'x64',
         "-DCMAKE_PREFIX_PATH=$QtRoot", "-DOPENSSL_ROOT_DIR=$OpenSslRoot",
         '-DBUILD_TESTING=OFF', '-DQ_BROWSER_BUILD_WEBENGINE=ON')
-    Invoke-TrackedBuild @('--build', $build, '--config', 'Release', '--parallel', '2',
+    Invoke-TrackedBuild @('--build', $build, '--config', 'Release', '--parallel', '8',
         '--', '/nr:false')
     Assert-StableTrustedPath $build $buildIdentity
     Assert-ProtectedPath $build
@@ -2524,6 +2544,17 @@ $buildParentIdentity = Get-PathIdentity $trustedBuildRoot
         -KeyDirectory (Join-Path $trusted 'signing') -TrustedRoot $trusted `
         -SourceDirectory $sourceStage -ParentTrustedRootLeaseHeld -Clean:$Clean
     if ($LASTEXITCODE -ne 0) { throw 'Development Pilot package creation failed.' }
+    $demoOutputs = @()
+    if ($IncludeQmlDemos) {
+        foreach ($demo in @('elisa', 'tokodon', 'coffee')) {
+            $demoOutput = Join-Path $trusted "release-package-$demo"
+            & (Join-Path $sourceStage 'scripts\create-dev-package.ps1') -Configuration Release `
+                -BuildDirectory $build -OutputDirectory $demoOutput `
+                -KeyDirectory (Join-Path $trusted 'signing') -TrustedRoot $trusted `
+                -SourceDirectory $sourceStage -PackageName $demo -ParentTrustedRootLeaseHeld -Clean:$DevelopmentOnly
+            $demoOutputs += (Join-Path $demoOutput "com.qbrowser.demo.$demo-1.0.0.qapkg")
+        }
+    }
     Assert-TrustedAncestorChain $packageOutput $trusted
     $packageOutputIdentity = Get-PathIdentity $packageOutput
     [void](New-DirectoryLease $packageOutput)
@@ -2544,6 +2575,11 @@ $buildParentIdentity = Get-PathIdentity $trustedBuildRoot
             (Join-Path $staging 'packages'), (Join-Path $staging 'trust'))) {
         Protect-Path $container -Container
     }
+    foreach ($demoPackage in $demoOutputs) {
+        $destination = Join-Path (Join-Path $staging 'packages') (Split-Path $demoPackage -Leaf)
+        Copy-Item -LiteralPath $demoPackage -Destination $destination
+        Protect-Path $destination
+    }
     foreach ($file in @((Join-Path $staging 'host\qbrowser-host.exe'),
             (Join-Path $staging 'runtime\qbrowser-worker.exe'),
             (Join-Path $staging 'packages\com.qbrowser.pilot-1.0.0.qapkg'),
@@ -2551,9 +2587,31 @@ $buildParentIdentity = Get-PathIdentity $trustedBuildRoot
             (Join-Path $staging 'SHA-256SUMS'))) {
         Protect-Path $file
     }
-    Invoke-Checked $CMake @('-DQ_BROWSER_DEPLOY_MODE=PREVERIFY',
+    Invoke-Checked $CMake @('-DQ_BROWSER_DEPLOY_MODE=SEAL_DEVELOPMENT',
         "-DQ_BROWSER_DEPLOY_DIR=$staging", '-P', $deployScript)
     Assert-StableTrustedPath $staging $stagingIdentity
+
+    if ($DevelopmentOnly) {
+        # Keep release attestation absent: this artifact still requires manual
+        # application validation and cannot pass the production VERIFY mode.
+        if ((Get-PathIdentity $trustedBuildRoot) -ne $buildParentIdentity) {
+            throw 'Trusted build parent changed before development publication.'
+        }
+        Assert-NoReparseAncestor $deployment
+        if (Test-Path -LiteralPath $deployment) { throw 'Development destination already exists.' }
+        $stagingLease.Dispose()
+        Move-Item -LiteralPath $staging -Destination $deployment
+        # Directory publication can recalculate inherited ACLs on Windows.
+        # Check the final paths used by Host, not only the staging tree.
+        foreach ($container in @($deployment, (Join-Path $deployment 'host'),
+                (Join-Path $deployment 'runtime'), (Join-Path $deployment 'packages'),
+                (Join-Path $deployment 'trust'))) {
+            Protect-Path $container -Container
+            Assert-ProtectedPath $container
+        }
+        Write-Output "Unattested development deployment prepared: $deployment"
+        return
+    }
 
     $forbiddenSymbols = @('qbrowser_host_testing', 'qbrowser_archive_testing',
         'forceLifecycleQueueFullForTesting', 'retryWorkerCleanupForTesting')
@@ -2646,6 +2704,7 @@ catch {
 }
 finally {
     $env:TEMP = $previousTemp
+    [Environment]::SetEnvironmentVariable('VCINSTALLDIR', $previousVcInstallDir, 'Process')
     $env:TMP = $previousTmp
     $env:PATH = $previousPath
     Restore-ProcessEnvironmentState 'SOURCE_DATE_EPOCH' $previousSourceDateEpoch

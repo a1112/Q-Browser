@@ -23,6 +23,21 @@ class BrowserAddressTest final : public QObject
 
 private slots:
     void acceptsExactNewTab();
+    void acceptsHttpQmlSites()
+    {
+        const auto site = BrowserAddress::parse(u"http://127.0.0.1:18880/demos/elisa");
+        QVERIFY(site.isValid());
+        QCOMPARE(site.kind(), BrowserAddressKind::App);
+        QCOMPARE(site.appPath(), QStringLiteral("/demos/elisa"));
+        QCOMPARE(site.canonical(), QStringLiteral("http://127.0.0.1:18880/demos/elisa"));
+        QVERIFY(BrowserAddress::parse(u"https://example.test/demos/coffee").isValid());
+        for (const auto bad : {u"http://user:pass@example.test/demos/elisa",
+                               u"http://example.test/demos/elisa#x",
+                               u"http://example.test/demos/elisa?x=y",
+                               u"http://example.test/../demos/elisa",
+                               u"http://example.test:0/demos/elisa"})
+            QVERIFY(!BrowserAddress::parse(bad).isValid());
+    }
     void parsesCanonicalAppAddress();
     void acceptsConfiguredAppAuthority();
     void preservesSyntacticallyValidUnregisteredAppPath();
@@ -150,8 +165,6 @@ void BrowserAddressTest::rejectsUnsupportedScheme_data()
 {
     QTest::addColumn<QString>("input");
 
-    QTest::newRow("http") << QStringLiteral("http://example.test/");
-    QTest::newRow("https") << QStringLiteral("https://example.test/");
     QTest::newRow("file") << QStringLiteral("file:///C:/secret.txt");
     QTest::newRow("data") << QStringLiteral("data:text/plain,hello");
     QTest::newRow("javascript") << QStringLiteral("javascript:alert(1)");

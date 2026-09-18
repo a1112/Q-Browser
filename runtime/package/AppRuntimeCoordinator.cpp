@@ -379,6 +379,21 @@ AppRuntimeResult AppRuntimeCoordinator::installAndActivate(
     return verifiedStartupResult(*descriptor);
 }
 
+AppRuntimeResult AppRuntimeCoordinator::installSitePackage(const QString &path,
+                                                          const QString &packageId)
+{
+    if (shuttingDown_ || failedClosed_ || pendingDrain_.has_value()
+        || packageId.isEmpty() || packageId == appId_)
+        return rejectedResult(QStringLiteral("site_install_unavailable"));
+    InstallResult installed = installer_.install(path, packageId);
+    if (!settleTemporaryVerification(installed)) {
+        failedClosed_ = true;
+        return immutableCleanupFailureResult();
+    }
+    if (!installed.succeeded()) return rejectedResult(installed.stableError);
+    return {};
+}
+
 AppRuntimeResult AppRuntimeCoordinator::startOffline(const qint64 nowMs)
 {
     Q_UNUSED(nowMs);
@@ -489,7 +504,8 @@ AppRuntimeResult AppRuntimeCoordinator::requestTabLaunch(
     const TabLaunchAuthority &tab,
     const QString &route,
     const TabLaunchIntent intent,
-    const qint64 nowMs)
+    const qint64 nowMs,
+    const QString &packageId)
 {
     if (shuttingDown_) return rejectedResult(QStringLiteral("shutdown"));
     if (failedClosed_) return failedClosedResult(QStringLiteral("app_failed_closed"));
@@ -526,10 +542,12 @@ AppRuntimeResult AppRuntimeCoordinator::requestTabLaunch(
         replacement = closeTab(*previousIncarnation, now);
     }
 
+    const QString requestedApp = packageId.isEmpty() ? appId_ : packageId;
     TabState *existing = findTab(tab);
     if (intent == TabLaunchIntent::ActivateCurrent && existing != nullptr
         && existing->hasRequest && existing->admitted && !existing->revoked
-        && !existing->retired && !existing->failedClosed) {
+        && !existing->retired && !existing->failedClosed
+        && existing->pinnedLease.appId == requestedApp) {
         // Route changes and ordinary activation never retarget a live tab to
         // a newly installed current package.  Its admitted lease remains
         // pinned until an explicit ReloadCurrent request.
@@ -551,6 +569,17 @@ AppRuntimeResult AppRuntimeCoordinator::requestTabLaunch(
                            pinned->lease.activationGenerationAtIssue};
         descriptor = &*pinned;
         mode = PackageRevalidationMode::PinnedLease;
+    } else if (requestedApp != appId_) {
+        const ActivationStateResult state = store_.activationState(requestedApp);
+        const auto binding = state.hasValue() ? store_.bindingForState(state.state) : std::nullopt;
+        if (!binding.has_value()) return rejectedResult(QStringLiteral("package_not_installed"));
+        InstallResult verified = installer_.reverifyInstalledVersion(requestedApp, *binding);
+        pinned = descriptorFromResult(verified, *binding);
+        const QString verificationError = verified.stableError;
+        if (!settleTemporaryVerification(verified)) return immutableCleanupFailureResult();
+        if (!pinned.has_value()) return rejectedResult(verificationError.isEmpty()
+            ? QStringLiteral("package_verification_failed") : verificationError);
+        descriptor = &*pinned;
     } else if (current_.has_value()) {
         descriptor = &*current_;
         mode = PackageRevalidationMode::PinnedLease;

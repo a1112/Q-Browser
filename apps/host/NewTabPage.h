@@ -45,6 +45,7 @@ public:
     void setRecentRoutes(const QVector<NewTabEntry> &validatedRoutes);
     void showExamples();
     void showPilotRoutes();
+    void setPackageRuntimeEnabled(bool enabled);
 
 signals:
     void addressActivated(const QString &canonicalAddress);

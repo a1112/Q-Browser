@@ -143,6 +143,7 @@ QVector<ManifestError> unknownFields(const QJsonObject &object)
                          QStringLiteral("clipboardWrite"),
                          QStringLiteral("clipboardRead"),
                          QStringLiteral("fileOpen"),
+                         QStringLiteral("audioPlayback"),
                          QStringLiteral("process")},
                         QStringLiteral("$.permissions"));
 
@@ -358,6 +359,13 @@ QVector<ManifestError> validateImports(const QJsonArray &imports)
 QVector<ManifestError> validatePermissionShape(const QJsonObject &permissions)
 {
     QVector<ManifestError> errors;
+    const auto audio = permissions.value(QStringLiteral("audioPlayback"));
+    if (!audio.isUndefined() && (!audio.isString()
+        || audio.toString() != QStringLiteral("package-assets"))) {
+        errors.append({ManifestErrorCode::WrongType,
+            QStringLiteral("$.permissions.audioPlayback"),
+            QStringLiteral("audioPlayback must be package-assets")});
+    }
     const QJsonValue network = permissions.value(QStringLiteral("network"));
     if (!network.isUndefined() && !network.isObject()) {
         errors.append({ManifestErrorCode::WrongType,
@@ -947,6 +955,8 @@ ManifestParseResult Manifest::parse(const QByteArray &bytes)
     }
     manifest.m_permissions.clipboardWrite =
         permissions.value(QStringLiteral("clipboardWrite")).toBool();
+    manifest.m_permissions.audioPlayback = permissions.value(
+        QStringLiteral("audioPlayback")).toString() == QStringLiteral("package-assets");
     if (permissions.value(QStringLiteral("clipboardRead")).toString()
         == QStringLiteral("user-gesture")) {
         manifest.m_permissions.clipboardRead = ClipboardReadPermission::UserGesture;

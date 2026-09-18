@@ -23,6 +23,8 @@ public:
     bool focusNativeWindow();
     WId nativeWindowId() const noexcept;
     WorkerAttemptId attemptId() const noexcept;
+    quint64 processIdForMonitoring() const noexcept;
+    quint64 processCreationTimeForMonitoring() const noexcept;
 
 protected:
     void focusInEvent(QFocusEvent *event) override;

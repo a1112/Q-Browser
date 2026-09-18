@@ -1,4 +1,5 @@
 #include "HostApplication.h"
+#include "QmlSiteLoader.h"
 
 #include "EventRecorder.h"
 #include "AppTabRuntimeController.h"
@@ -22,6 +23,7 @@
 
 #include "PilotRoutes.h"
 #include "RouteRegistry.h"
+#include "DemoRoutes.h"
 #include "WebSessionProfile.h"
 
 #include <QPointer>
@@ -32,6 +34,8 @@
 #include <QFile>
 #include <QThread>
 #include <QTimer>
+#include <QUuid>
+#include "HostOwnedStateDirectory.h"
 
 #include <algorithm>
 #include <atomic>
@@ -72,6 +76,35 @@ struct HostApplication::PackageStartupTestingState final
 
 namespace
 {
+struct DownloadedSitePackage final
+{
+    QString path;
+    std::shared_ptr<const HostOwnedFileAuthority> authority;
+    ~DownloadedSitePackage() { authority.reset(); if (!path.isEmpty()) QFile::remove(path); }
+    bool write(const HostOwnedStateDirectory &directory, const QByteArray &bytes)
+    {
+#ifdef Q_OS_WIN
+        if (!directory.revalidate()) return false;
+        qbrowser_archive_detail::WindowsStableDirectoryTree tree;
+        if (!tree.openSharedRoot(directory.canonicalPath())) return false;
+        const QString candidate = directory.canonicalPath() + QStringLiteral("/site-")
+            + QUuid::createUuid().toString(QUuid::Id128) + QStringLiteral(".qapkg");
+        {
+            qbrowser_archive_detail::WindowsStableFile output;
+            if (!output.createRestrictedOutput(candidate, tree)) return false;
+            path = candidate;
+            if (!output.writeAll(bytes.constData(), static_cast<size_t>(bytes.size()))
+                || !output.flush()) return false;
+        }
+        authority = HostOwnedFileAuthority::open(path, true);
+        return authority && directory.revalidate();
+#else
+        Q_UNUSED(directory);
+        Q_UNUSED(bytes);
+        return false;
+#endif
+    }
+};
 constexpr qsizetype MaximumPendingLifecycleOperations = 512;
 
 void recordHostDiagnosticPhase(const QByteArray &phase)
@@ -1142,12 +1175,12 @@ AppTabRuntimeController *HostApplication::ensureAppTabRuntimeController(
 void HostApplication::handleAppLaunchRequested(
     const QString &tabId, const quint64 navigationIncarnation,
     const QString &packageId, const QString &route,
-    const bool reload)
+    const bool reload, const bool siteVerified)
 {
     if (!runtimeConfig_.has_value()
         || runtimeConfig_->mode() != HostRuntimeMode::Package
         || mainWindow_ == nullptr || route.isEmpty()
-        || packageId != runtimeConfig_->appId()) {
+        || (packageId != runtimeConfig_->appId() && !isQmlDemoRoute(packageId, route))) {
         return;
     }
     TabController *const tab = mainWindow_->tabController(tabId);
@@ -1178,6 +1211,77 @@ void HostApplication::handleAppLaunchRequested(
         || trustedAddress.appPath() != route) {
         return;
     }
+    if (snapshot.address.startsWith(QStringLiteral("http")) && !siteVerified) {
+        if (!isQmlDemoRoute(packageId, route) || packageId == runtimeConfig_->appId()) {
+            tab->showTrustedErrorForNavigation(navigationIncarnation,
+                QStringLiteral("请使用 Pilot 主包启动 HTTP QML 站点环境。"));
+            return;
+        }
+        // Stop the previous session immediately, including its audio authority.
+        handleAppStopRequested(tabId, navigationIncarnation, 0);
+        QPointer<HostApplication> guard(this);
+        QPointer<TabController> tabGuard(tab);
+        auto current = [tabGuard, navigationIncarnation] {
+            return tabGuard && tabGuard->incarnation() == navigationIncarnation;
+        };
+        auto *loader = new QmlSiteLoader(tab, QUrl(snapshot.address), packageId, route,
+            [guard, tabGuard, current, tabId, navigationIncarnation, packageId, route]
+            (QByteArray bytes, QString error) {
+                if (!guard || !current()) return;
+                if (!error.isEmpty()) {
+                    tabGuard->showTrustedErrorForNavigation(navigationIncarnation, error);
+                    return;
+                }
+                auto file = std::make_shared<DownloadedSitePackage>();
+                if (!file->write(*guard->runtimeConfig_->browserStateAuthority(), bytes)) {
+                    tabGuard->showTrustedErrorForNavigation(navigationIncarnation,
+                        QStringLiteral("无法保存下载的 QML 应用包。"));
+                    return;
+                }
+                const auto authority = file->authority;
+                if (!authority) {
+                    tabGuard->showTrustedErrorForNavigation(navigationIncarnation,
+                        QStringLiteral("QML 应用包下载目录未通过本机信任检查。"));
+                    return;
+                }
+                const bool queued = guard->enqueuePackageRuntime(
+                    [guard, tabGuard, current, tabId, navigationIncarnation, packageId, route,
+                     file](AppRuntimeCoordinator &coordinator) {
+                        AppRuntimeResult result;
+                        if (!file->authority->revalidate()) {
+                            result.code = AppRuntimeResultCode::Rejected;
+                            result.stableError = QStringLiteral("site_source_changed");
+                        } else {
+                            result = coordinator.installSitePackage(file->path, packageId);
+                        }
+                        if (!guard) return;
+                        QMetaObject::invokeMethod(guard,
+                            [guard, tabGuard, current, tabId, navigationIncarnation, packageId, route, result] {
+                                if (!guard) return;
+                                if (result.code == AppRuntimeResultCode::FailedClosed)
+                                    guard->handleAppRuntimeResult(result);
+                                if (!current()) return;
+                                if (result.code != AppRuntimeResultCode::Applied) {
+                                    tabGuard->showTrustedErrorForNavigation(navigationIncarnation,
+                                        QStringLiteral("QML 网站包验证或安装失败：") + result.stableError);
+                                    return;
+                                }
+                                if (!tabGuard->prepareAppLaunch(packageId, navigationIncarnation)) return;
+                                guard->handleAppLaunchRequested(tabId, navigationIncarnation,
+                                                               packageId, route, true, true);
+                            }, Qt::QueuedConnection);
+                    });
+                if (!queued) tabGuard->showTrustedErrorForNavigation(navigationIncarnation,
+                    QStringLiteral("QML 网站安装队列不可用。"));
+            });
+        auto *cancel = new QTimer(loader);
+        connect(cancel, &QTimer::timeout, loader, [loader, current] {
+            if (!current()) loader->deleteLater();
+        });
+        cancel->start(100);
+        loader->start();
+        return;
+    }
     const bool supersedesUnmaterializedLaunch = !reload
         && pendingAppNavigationIncarnations_.contains(tabId)
         && !runtime->currentRequest().has_value()
@@ -1198,10 +1302,10 @@ void HostApplication::handleAppLaunchRequested(
         : TabLaunchIntent::ActivateCurrent;
     QPointer<HostApplication> guard(this);
     const bool queued = enqueueAppRuntime(
-        [guard, authority, route, intent, tabId, navigationIncarnation](
+        [guard, authority, route, packageId, intent, tabId, navigationIncarnation](
             AppRuntimeCoordinator &coordinator) {
             const AppRuntimeResult result = coordinator.requestTabLaunch(
-                authority, route, intent, -1);
+                authority, route, intent, -1, packageId);
             QMetaObject::invokeMethod(
                 guard,
                 [guard, result, tabId, navigationIncarnation] {
@@ -1996,9 +2100,12 @@ bool HostApplication::enqueuePackageStartupInitialization(
     if (!runtime || !runtime->reserve()) return false;
 
     InstallPolicy installPolicy;
-    installPolicy.expectedAppId = runtimeConfig_->appId();
-    installPolicy.runtimeVersion = QStringLiteral("1.2.0");
+    installPolicy.allowedAppIds.insert(runtimeConfig_->appId());
+    for (const auto &demo : qmlDemoRoutes)
+        installPolicy.allowedAppIds.insert(QString::fromLatin1(demo.packageId));
+    installPolicy.runtimeVersion = QStringLiteral("1.3.0");
     installPolicy.allowedImports = {QStringLiteral("QtQuick"),
+                                    QStringLiteral("QtQuick.Controls"),
                                     QStringLiteral("QtQuick.Layouts"),
                                     QStringLiteral("Company.Design")};
     installPolicy.preflight = [](const Manifest &, const QString &) {
@@ -2114,8 +2221,8 @@ bool HostApplication::applyVerifiedPackageStartup(
                 return BrowserTabKind::Web;
             }
             if (matched.record.engine == Engine::QmlWorker
-                && configuredAppId == verifiedAppId
-                && matched.record.packageId == verifiedAppId) {
+                && ((configuredAppId == verifiedAppId && matched.record.packageId == verifiedAppId)
+                    || isQmlDemoRoute(matched.record.packageId, trusted.appPath()))) {
                 return BrowserTabKind::App;
             }
             return std::nullopt;
@@ -2552,7 +2659,7 @@ HostApplication::realizeWorkerContext(WorkerAttachContext context)
         request.lease.permissions, runtimeConfig_->mockOrigin(),
         runtimeConfig_->storageDirectory(),
         static_cast<quintptr>(mainWindow_->winId()), &capabilityError,
-        fileDialogCoordinator_.get());
+        fileDialogCoordinator_.get(), request.lease.packageDirectory);
     if (capabilityRuntime == nullptr) {
         emit updateLifecycleFailed(
             capabilityError.isEmpty()

@@ -1,4 +1,9 @@
 add_executable(tst_host_runtime_config tst_host_runtime_config.cpp)
+add_executable(tst_audio_broker tst_audio_broker.cpp)
+target_link_libraries(tst_audio_broker PRIVATE q_browser_host Qt6::Test Qt6::Widgets)
+target_compile_definitions(tst_audio_broker PRIVATE Q_BROWSER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+q_browser_enable_strict_warnings(tst_audio_broker)
+q_browser_add_qt_test(NAME audio_broker TARGET tst_audio_broker)
 
 target_link_libraries(tst_host_runtime_config
   PRIVATE
@@ -77,6 +82,10 @@ q_browser_enable_strict_warnings(tst_performance_monitor)
 q_browser_add_qt_test(NAME performance_monitor TARGET tst_performance_monitor)
 
 add_executable(tst_browser_chrome tst_browser_chrome.cpp)
+add_executable(tst_qml_site_loader tst_qml_site_loader.cpp)
+target_link_libraries(tst_qml_site_loader PRIVATE q_browser_host Qt6::Test Qt6::Network)
+q_browser_enable_strict_warnings(tst_qml_site_loader)
+q_browser_add_qt_test(NAME qml_site_loader TARGET tst_qml_site_loader)
 target_link_libraries(tst_browser_chrome
   PRIVATE
     q_browser_host

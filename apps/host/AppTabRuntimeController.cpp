@@ -586,7 +586,7 @@ AppTabRuntimeController::realizeAttach(
     auto capability = HostCapabilityRuntime::create(
         authority, target.request.admission, gestureRouter_.data(),
         target.request.lease.permissions, mockOrigin_, storageDirectory_, hostWindowId_,
-        &capabilityError, fileDialogCoordinator_);
+        &capabilityError, fileDialogCoordinator_, target.request.lease.packageDirectory);
     // The production factory needs the configured storage directory. A
     // controller constructed by HostApplication supplies it through the
     // capability factory below; this guard keeps malformed test fixtures

@@ -110,6 +110,10 @@
           "type": "string",
           "const": "app-private"
         },
+        "audioPlayback": {
+          "type": "string",
+          "const": "package-assets"
+        },
         "clipboardWrite": {
           "type": "boolean"
         },

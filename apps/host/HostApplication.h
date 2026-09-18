@@ -192,7 +192,8 @@ private:
                                   quint64 navigationIncarnation,
                                   const QString &packageId,
                                   const QString &route,
-                                  bool reload = false);
+                                   bool reload = false,
+                                   bool siteVerified = false);
     void handleAppStopRequested(const QString &tabId,
                                 quint64 navigationIncarnation,
                                 quint64 runtimeIncarnation);

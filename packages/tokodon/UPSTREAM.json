@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/KDE/tokodon",
+  "tag": "v26.08.1",
+  "commit": "dd5073bf631c826345753e03f05f27945fd6925a",
+  "files": [
+    {
+      "upstream": "src/qml/PostDelegate/InteractionButton.qml",
+      "file": "qml/InteractionButton.qml",
+      "sha256": "54b7bb09e2c6532f8c913b08557affb4d338062616ad570cf6a39f805375386b"
+    }
+  ]
+}

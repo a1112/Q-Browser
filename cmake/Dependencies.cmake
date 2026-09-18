@@ -12,7 +12,7 @@ set(q_browser_qt_components
   QuickTest)
 
 if(Q_BROWSER_BUILD_WEBENGINE)
-  list(APPEND q_browser_qt_components WebEngineCore WebEngineWidgets)
+  list(APPEND q_browser_qt_components WebEngineCore WebEngineWidgets Multimedia)
 endif()
 
 find_package(Qt6 6.11 REQUIRED COMPONENTS ${q_browser_qt_components})

@@ -123,6 +123,20 @@ class ManifestTest final : public QObject
     Q_OBJECT
 
 private slots:
+    void audioPermissionIsExplicitAndPackageOnly()
+    {
+        const auto absent = Manifest::parse(withTopLevelValue(QStringLiteral("permissions"), QJsonObject{}));
+        QVERIFY(absent.hasValue());
+        QVERIFY(!absent.value().permissions().audioPlayback);
+        const auto allowed = Manifest::parse(withTopLevelValue(QStringLiteral("permissions"),
+            QJsonObject{{QStringLiteral("audioPlayback"), QStringLiteral("package-assets")}}));
+        QVERIFY(allowed.hasValue());
+        QVERIFY(allowed.value().permissions().audioPlayback);
+        for (const QJsonValue &value : {QJsonValue(true), QJsonValue(QStringLiteral("all")), QJsonValue(QStringLiteral("https://example.com/a.wav"))}) {
+            QVERIFY(!Manifest::parse(withTopLevelValue(QStringLiteral("permissions"),
+                QJsonObject{{QStringLiteral("audioPlayback"), value}})).hasValue());
+        }
+    }
     void parsesValidManifest();
     void parseResultStatesAreTotal();
     void rejectsMalformedJson();

@@ -2,6 +2,8 @@
 #include "PerformancePanel.h"
 
 #include <QApplication>
+#include <QComboBox>
+#include <QSignalSpy>
 #include <QLabel>
 #include <QProcess>
 #include <QTest>
@@ -18,6 +20,7 @@ private slots:
     void samplesCurrentProcessAndChild();
     void panelPausesStopsAndResumes();
     void reportsUiStalls();
+    void tabScopesTrackSharingRemovalAndProcessIdentity();
 };
 
 void PerformanceMonitorTest::computesWholeMachineCpuAndMemory()
@@ -137,6 +140,48 @@ void PerformanceMonitorTest::reportsUiStalls()
     QThread::msleep(400);
     QTRY_VERIFY(latency->text().split(QLatin1Char(' '), Qt::SkipEmptyParts)
                     .value(1).toLongLong() >= 200);
+}
+
+void PerformanceMonitorTest::tabScopesTrackSharingRemovalAndProcessIdentity()
+{
+    BrowserResourceCounts resources;
+    const auto pid = quint64(QCoreApplication::applicationPid());
+    resources.tabResources = {
+        {QStringLiteral("one"), QStringLiteral("音乐"), QStringLiteral("app://pilot/demos/elisa"),
+         QStringLiteral("前台"), QStringLiteral("独立 Worker"), pid, 0, true},
+        {QStringLiteral("two"), QStringLiteral("社区"), QStringLiteral("app://pilot/demos/tokodon"),
+         QStringLiteral("后台"), QStringLiteral("渲染进程"), pid, 0, false},
+        {QStringLiteral("host"), QStringLiteral("示例中心"), {}, {}, QStringLiteral("Host 共享界面"), 0, 0, false}
+    };
+    PerformancePanel panel([&resources] { return resources; });
+    panel.show();
+    auto *scope = panel.findChild<QComboBox *>(QStringLiteral("performance-scope"));
+    auto *tabs = panel.findChild<QTreeWidget *>(QStringLiteral("performance-tabs"));
+    auto *memory = panel.findChild<QLabel *>(QStringLiteral("performance-memory"));
+    auto *attribution = panel.findChild<QLabel *>(QStringLiteral("performance-attribution"));
+    QVERIFY(scope && tabs && memory && attribution);
+    QTRY_COMPARE(tabs->topLevelItemCount(), 3);
+    QSignalSpy removedChoices(scope->model(), &QAbstractItemModel::rowsRemoved);
+    QTest::qWait(1200);
+    QCOMPARE(removedChoices.count(), 0); // Sampling must not reset an open scope chooser.
+    QVERIFY(tabs->topLevelItem(0)->text(0).contains(QStringLiteral("共享进程")));
+    scope->setCurrentIndex(scope->findData(QStringLiteral("one")));
+    QTRY_VERIFY(attribution->text().startsWith(QStringLiteral("音乐")));
+#ifdef Q_OS_WIN
+    QTRY_VERIFY(memory->text().contains(QStringLiteral("MB")));
+#endif
+    // A stale process snapshot must never be attributed to a reused Worker PID.
+    resources.tabResources[0].creationTime = 1;
+    QTRY_COMPARE(memory->text(), QStringLiteral("内存  —"));
+    resources.tabResources.removeFirst();
+    resources.tabResources[0].active = true;
+    QTRY_COMPARE(tabs->topLevelItemCount(), 2);
+    QTRY_COMPARE(scope->currentData().toString(), QStringLiteral("active"));
+    QTRY_VERIFY(attribution->text().startsWith(QStringLiteral("社区")));
+    resources.tabResources[0].active = false;
+    resources.tabResources[1].active = true;
+    QTRY_VERIFY(attribution->text().startsWith(QStringLiteral("示例中心")));
+    QCOMPARE(memory->text(), QStringLiteral("内存  —"));
 }
 
 int main(int argc, char **argv)

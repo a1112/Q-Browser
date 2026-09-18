@@ -4,6 +4,11 @@
 #include "BrowserTabModel.h"
 #include "DemoGallery.h"
 
+void NewTabPage::setPackageRuntimeEnabled(bool enabled)
+{
+    demoGallery_->setPackageRuntimeEnabled(enabled);
+}
+
 #include <QKeySequence>
 #include <QLabel>
 #include <QList>
@@ -151,6 +156,7 @@ NewTabPage::NewTabPage(QWidget *parent)
     sections_->setObjectName(QStringLiteral("new-tab-sections"));
     sections_->setDocumentMode(true);
     demoGallery_ = new DemoGallery(sections_);
+    connect(demoGallery_, &DemoGallery::routeRequested, this, &NewTabPage::addressActivated);
     sections_->addTab(demoGallery_, QStringLiteral("示例中心"));
     auto *pilotScroll = new QScrollArea(sections_);
     pilotScroll->setWidgetResizable(true);

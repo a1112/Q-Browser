@@ -55,6 +55,18 @@ class PolicyEngineTest final : public QObject
     Q_OBJECT
 
 private slots:
+    void audioRequiresBothAuthorizations()
+    {
+        ManifestPermissions manifest;
+        HostPolicy host;
+        QVERIFY(!PolicyEngine::intersect(manifest, host).audioPlayback);
+        manifest.audioPlayback = true;
+        QVERIFY(!PolicyEngine::intersect(manifest, host).audioPlayback);
+        host.audioPlayback = true;
+        QVERIFY(PolicyEngine::intersect(manifest, host).audioPlayback);
+        manifest.audioPlayback = false;
+        QVERIFY(!PolicyEngine::intersect(manifest, host).audioPlayback);
+    }
     void intersectsEveryDeclaredCapability();
     void absentOnEitherSideMeansDeny();
     void hostPolicyRejectsRegexLikeAndInvalidValues();

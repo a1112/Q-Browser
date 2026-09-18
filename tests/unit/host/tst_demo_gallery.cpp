@@ -16,11 +16,26 @@
 #include <QTableWidget>
 #include <QTabWidget>
 #include <QTest>
+#include <QSignalSpy>
 #include <array>
 
 class DemoGalleryTest final : public QObject {
     Q_OBJECT
 private slots:
+    void qmlCardsRespectRuntimeAvailability()
+    {
+        DemoGallery gallery;
+        QSignalSpy routes(&gallery, &DemoGallery::routeRequested);
+        QVERIFY(gallery.openDemo(QStringLiteral("elisa")));
+        QCOMPARE(routes.count(), 0);
+        QVERIFY(gallery.findChild<QLabel *>(QStringLiteral("demo-runtime-status")) != nullptr);
+        gallery.setPackageRuntimeEnabled(true);
+        for (const auto &id : {"elisa", "tokodon", "coffee"}) {
+            QVERIFY(gallery.openDemo(QLatin1StringView(id)));
+            QCOMPARE(routes.last().at(0).toString(), QStringLiteral("app://pilot/demos/") + QLatin1StringView(id));
+        }
+        QCOMPARE(routes.count(), 3);
+    }
     void newTabsOpenExamplesAndKeepPilotAvailable();
     void catalogFiltersAndOpensExamples();
     void controlsApplySettings();

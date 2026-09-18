@@ -6,6 +6,7 @@
 #include <QChar>
 #include <QList>
 #include <QStringConverter>
+#include <QUrl>
 
 #include <utility>
 
@@ -222,6 +223,22 @@ BrowserAddress BrowserAddress::parse(const QStringView input, const QStringView 
         return BrowserAddress(BrowserAddressError::InvalidUrl);
     }
     const QStringView scheme = input.first(schemeEnd);
+
+    // HTTP sites use the same logical route grammar as packaged applications.
+    // Transport never grants package trust; Host verifies the downloaded archive.
+    if (scheme == u"http" || scheme == u"https") {
+        const QUrl url(input.toString(), QUrl::StrictMode);
+        if (!url.isValid() || url.host().isEmpty() || !url.userInfo().isEmpty()
+            || url.hasFragment() || url.hasQuery() || url.port() == 0
+            || url.toString(QUrl::FullyEncoded) != input) {
+            return BrowserAddress(BrowserAddressError::InvalidUrl);
+        }
+        const QString path = url.path(QUrl::FullyEncoded);
+        const AppUrl route = AppUrl::parse(QStringLiteral("app://pilot") + path, u"pilot");
+        if (!route.isValid()) return BrowserAddress(BrowserAddressError::AppUrlInvalid);
+        return BrowserAddress(BrowserAddressError::None, BrowserAddressKind::App,
+                              input.toString(), path);
+    }
 
     if (scheme == u"qbrowser") {
         if (input != u"qbrowser://newtab") {

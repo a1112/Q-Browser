@@ -107,6 +107,20 @@ bool WorkerSurface::focusNativeWindow()
 WId WorkerSurface::nativeWindowId() const noexcept { return windowId_; }
 WorkerAttemptId WorkerSurface::attemptId() const noexcept { return attemptId_; }
 
+quint64 WorkerSurface::processIdForMonitoring() const noexcept
+{
+    return !invalidated_ && validHandle(process_)
+        && WaitForSingleObject(process_, 0) == WAIT_TIMEOUT ? processId_ : 0;
+}
+
+quint64 WorkerSurface::processCreationTimeForMonitoring() const noexcept
+{
+    FILETIME created{}, exited{}, kernel{}, user{};
+    if (!processIdForMonitoring()
+        || !GetProcessTimes(process_, &created, &exited, &kernel, &user)) return 0;
+    return (quint64(created.dwHighDateTime) << 32) | created.dwLowDateTime;
+}
+
 bool WorkerSurface::refreshValidity()
 {
     if (invalidated_ || !validHandle(process_)

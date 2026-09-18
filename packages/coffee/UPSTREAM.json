@@ -1,0 +1,257 @@
+{
+  "repository": "https://github.com/qt/qtdoc",
+  "tag": "v6.11.0",
+  "commit": "7c98216e33fa52c8137a439a2b2a4201640c3b2e",
+  "files": [
+    {
+      "upstream": "examples/demos/coffee/ApplicationFlow.qml",
+      "file": "qml/ApplicationFlow.qml",
+      "sha256": "c88a97348c19fd779269f9af06f045bf5c3717737e63edc9426040684eb92d85"
+    },
+    {
+      "upstream": "examples/demos/coffee/ApplicationFlowForm.ui.qml",
+      "file": "qml/ApplicationFlowForm.ui.qml",
+      "sha256": "cd5d818cfaa016420b63c9aae63f8820fc3f1c7f41541d68a59102c92686dae9"
+    },
+    {
+      "upstream": "examples/demos/coffee/ChoosingCoffee.qml",
+      "file": "qml/ChoosingCoffee.qml",
+      "sha256": "cd9d4102667c2a19480ba1695590e74b205b7b37e67233f4850738e87c2ca5df"
+    },
+    {
+      "upstream": "examples/demos/coffee/ChoosingCoffeeForm.ui.qml",
+      "file": "qml/ChoosingCoffeeForm.ui.qml",
+      "sha256": "5649aab3984e9da4d455ea67e9b667ef3d6b0db666e7d1c3a17d0a75dadf6dea"
+    },
+    {
+      "upstream": "examples/demos/coffee/CoffeeCard.qml",
+      "file": "qml/CoffeeCard.qml",
+      "sha256": "e386bf1d1aebf9f6b82e8ca0873b8c56e2011e8debe6deef4f46d97fee165b79"
+    },
+    {
+      "upstream": "examples/demos/coffee/CoffeeCardForm.ui.qml",
+      "file": "qml/CoffeeCardForm.ui.qml",
+      "sha256": "564abec9c3d29c53388cc8b56b7d15f13db55dc1f0c6a19c4a403893b9d25945"
+    },
+    {
+      "upstream": "examples/demos/coffee/CoffeeConfig.qml",
+      "file": "qml/CoffeeConfig.qml",
+      "sha256": "43fa2b308472709cf61cc002a606523a6f0e8d457583d36d03366b318a7e3c4d"
+    },
+    {
+      "upstream": "examples/demos/coffee/Colors.qml",
+      "file": "qml/Colors.qml",
+      "sha256": "8248c2e4a6617b71ff8ec961d88a66859a2e13feb00f053f717c9146f0167686"
+    },
+    {
+      "upstream": "examples/demos/coffee/Config.qml",
+      "file": "qml/Config.qml",
+      "sha256": "cab9ead2fd4e29a1577d93251373a2527dc3e64e354ca9d3534d2f4587c1eb0c"
+    },
+    {
+      "upstream": "examples/demos/coffee/Cup.ui.qml",
+      "file": "qml/Cup.ui.qml",
+      "sha256": "a6f0fe6d21b081e48463d5f84d8c1912b31930f89c55a3f2e126ab55f00a4329"
+    },
+    {
+      "upstream": "examples/demos/coffee/CustomButton.qml",
+      "file": "qml/CustomButton.qml",
+      "sha256": "38ee1ce5148acfe40e575ca6a56d170b952c86c70fa136e0f7678fd3884d5ee8"
+    },
+    {
+      "upstream": "examples/demos/coffee/CustomButtonForm.ui.qml",
+      "file": "qml/CustomButtonForm.ui.qml",
+      "sha256": "6fe3df2409ea34e2980fc30cb1111d13f864dfa290cab6de8c5e706c2093840b"
+    },
+    {
+      "upstream": "examples/demos/coffee/CustomSlider.qml",
+      "file": "qml/CustomSlider.qml",
+      "sha256": "94c0b311d629af775c8f7b7782f01c8e69f02cf0f13fd0d6cbf5d32fbeb6974e"
+    },
+    {
+      "upstream": "examples/demos/coffee/CustomSliderForm.ui.qml",
+      "file": "qml/CustomSliderForm.ui.qml",
+      "sha256": "1e87058e12a76a87a603acdfa8461aee371ed57017ee8c2902d6f86f7b22e3d2"
+    },
+    {
+      "upstream": "examples/demos/coffee/CustomToolBar.qml",
+      "file": "qml/CustomToolBar.qml",
+      "sha256": "20d369eea58eb7f243aff7b3cf6658358eec1a1fd630de69debdba36c8b4a37d"
+    },
+    {
+      "upstream": "examples/demos/coffee/CustomToolBarForm.ui.qml",
+      "file": "qml/CustomToolBarForm.ui.qml",
+      "sha256": "1daa952b0943a39d5fc808959da8a303d2f510784c9495ed8200b2acca8ce15d"
+    },
+    {
+      "upstream": "examples/demos/coffee/Home.qml",
+      "file": "qml/Home.qml",
+      "sha256": "a8e522ad3f6f847bd9bd967786c12552a1ab935206025c39fdd1033e7fef9a01"
+    },
+    {
+      "upstream": "examples/demos/coffee/HomeForm.ui.qml",
+      "file": "qml/HomeForm.ui.qml",
+      "sha256": "a0935f16e00d4bcdb4b9cd2125f642c7c07838e14fbba5ab25c3e726bb1715ac"
+    },
+    {
+      "upstream": "examples/demos/coffee/Insert.qml",
+      "file": "qml/Insert.qml",
+      "sha256": "27f9af5b9d59306c02330e1441ee8bdae7bf9b0047ce99eface217068637b7f5"
+    },
+    {
+      "upstream": "examples/demos/coffee/InsertForm.ui.qml",
+      "file": "qml/InsertForm.ui.qml",
+      "sha256": "6e389034bfdc6ba07cdbce04550339254abca4f68a731d328b3a98dd5323c797"
+    },
+    {
+      "upstream": "examples/demos/coffee/Main.qml",
+      "file": "qml/Main.qml",
+      "sha256": "3963ea5b9f70c5e96deee76b4e87d4471726757109b5b193abc28a9e9d1db595"
+    },
+    {
+      "upstream": "examples/demos/coffee/Progress.qml",
+      "file": "qml/Progress.qml",
+      "sha256": "28455244b06d11d1f4f32d00e13f6526af19ceb91e4486ce8d38b3748eb83d4d"
+    },
+    {
+      "upstream": "examples/demos/coffee/ProgressForm.ui.qml",
+      "file": "qml/ProgressForm.ui.qml",
+      "sha256": "6d09518907a8e3ec551536dc1f0a1af87c3414ec9d4e7c9b3cc4e15da7822f1e"
+    },
+    {
+      "upstream": "examples/demos/coffee/Ready.qml",
+      "file": "qml/Ready.qml",
+      "sha256": "a20efa70fe10b55aa6b6ca04c8650870436652dade9122984f161e095b7e7dcb"
+    },
+    {
+      "upstream": "examples/demos/coffee/ReadyForm.ui.qml",
+      "file": "qml/ReadyForm.ui.qml",
+      "sha256": "f3507fe732308cd7e12f5c062a87744ea39431ae78734db166f08afea70b2aca"
+    },
+    {
+      "upstream": "examples/demos/coffee/Settings.qml",
+      "file": "qml/Settings.qml",
+      "sha256": "b6dbb3efed9e7e0953915056aee46b549d0b5f5674fb35f2e5f1bb44d3c3913b"
+    },
+    {
+      "upstream": "examples/demos/coffee/SettingsForm.ui.qml",
+      "file": "qml/SettingsForm.ui.qml",
+      "sha256": "cc40495149be9ef4a1d6fdfe505393a6e2e438ccff2921a08a34e4c6f9fe828c"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/Cups/card_cup_dark.svg",
+      "file": "qml/images/Cups/card_cup_dark.svg",
+      "sha256": "27046056f2fbbd75c86f0f0f3f14ea4a92015ad20817ca9adcd141bbe027152e"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/Cups/card_cup_light.svg",
+      "file": "qml/images/Cups/card_cup_light.svg",
+      "sha256": "5601b0b0c8a9d85bc9f8a1ad6ce697e9122cb175f54ff68bb0a2202576f019bf"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/Cups/dark_cup.svgz",
+      "file": "qml/images/Cups/dark_cup.svgz",
+      "sha256": "ef758d9fe7bced1167677589ffd60c967f0e16e386594e9872a99d4805698bab"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/Cups/home_dark.svg",
+      "file": "qml/images/Cups/home_dark.svg",
+      "sha256": "afb9e5a1524853d5328a3d9d8933e715186d7f232100e9674d4471fd399d370a"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/Cups/home_light.svg",
+      "file": "qml/images/Cups/home_light.svg",
+      "sha256": "b13cfc529d7601a9b97c4cfff446bca27604d12d49ef7547357106a58a975f92"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/Cups/light_cup.svgz",
+      "file": "qml/images/Cups/light_cup.svgz",
+      "sha256": "652e5e6d9260c7c447add3ee3836a16507b39b2a393a7d5bb6a25f18210b6a62"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/icons/check.svg",
+      "file": "qml/images/icons/check.svg",
+      "sha256": "4bc4527b1e2394a64b0e88aa39b117b92d2e2c8df3f617303d60476aa28b1403"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/icons/dark_mode_black_24dp.svg",
+      "file": "qml/images/icons/dark_mode_black_24dp.svg",
+      "sha256": "9b4909c1f8eeb34fa4ba21f68b3879af360305761eb4e5a235ecec3bbd057286"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/icons/ellipse_dark.svg",
+      "file": "qml/images/icons/ellipse_dark.svg",
+      "sha256": "ff27a62b8095313b96b0d47e2cd37109c480e61779ca44d5047a5cd5157328b3"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/icons/ellipse_light.svg",
+      "file": "qml/images/icons/ellipse_light.svg",
+      "sha256": "d35fa2161e86df43986b8e6e586e12f380db581ab1ed30ccf35f685f04fca56c"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/icons/keyboard_backspace_black.svg",
+      "file": "qml/images/icons/keyboard_backspace_black.svg",
+      "sha256": "97109e9c197096b9e050a8d73fd25d9ad8e8bc0849a70637d24ea1a624d60524"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/icons/keyboard_backspace_black_left.svg",
+      "file": "qml/images/icons/keyboard_backspace_black_left.svg",
+      "sha256": "fc737b9fcfcfc2eb5a0072f102b8a2b6b35a6626ae83744e20f6374afa956c43"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/icons/keyboard_backspace_black_right.svg",
+      "file": "qml/images/icons/keyboard_backspace_black_right.svg",
+      "sha256": "bf60d873a9fc1e5c2e4a1c2b78d75a099100904601a82f7881fd926355d4aa0a"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/icons/keyboard_backspace_white_left.svg",
+      "file": "qml/images/icons/keyboard_backspace_white_left.svg",
+      "sha256": "09148702e8fb47e57d9fb1920ea17627dff5a139d6327205c3995c32a70c679f"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/icons/keyboard_backspace_white_right.svg",
+      "file": "qml/images/icons/keyboard_backspace_white_right.svg",
+      "sha256": "ef4ab140a768f224a8fdb286fa73da61b900fe2eb6d64cdbdb91436c54238061"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/icons/light_mode_black_24dp.svg",
+      "file": "qml/images/icons/light_mode_black_24dp.svg",
+      "sha256": "bfb08b791cd79923f48f1e318891addd2d0f1ad77292b66cc0e806dcf43d8261"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/icons/Polygon.svg",
+      "file": "qml/images/icons/Polygon.svg",
+      "sha256": "65672e29cbf4b59c46f8ec7d34490e8588bac9004bbb1845e39bdff36c89a143"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/icons/Qt-logo-white-transparent.svg",
+      "file": "qml/images/icons/Qt-logo-white-transparent.svg",
+      "sha256": "9c938ff8546acdc7b6e497c46b5bf1f1921391d1fa29b2b34a950309246f404f"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/Ingredients/espresso_coffee.svg",
+      "file": "qml/images/Ingredients/espresso_coffee.svg",
+      "sha256": "143131578775b9e2a1ff8edaf2fbde5489215fab6520f7a3d351843dae7cc50c"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/Ingredients/milk.svg",
+      "file": "qml/images/Ingredients/milk.svg",
+      "sha256": "2127468ddf7068b767638bb4d8b7fe31e532866d8fbb747d44a08d7018259b5c"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/Ingredients/Milk_foam.svg",
+      "file": "qml/images/Ingredients/Milk_foam.svg",
+      "sha256": "69c8027c17f5f8c0da6f02c405c368dd0d0ed9b2482a8406f9418cef3150a75b"
+    },
+    {
+      "upstream": "examples/demos/coffee/images/Ingredients/sugar.svg",
+      "file": "qml/images/Ingredients/sugar.svg",
+      "sha256": "eb7908414264e0e2e724d503edc79018df3db2612be44eea77d238b472f5db50"
+    },
+    {
+      "upstream": "REUSE.toml",
+      "file": "UPSTREAM-REUSE.toml",
+      "sha256": "0d91e449eee58689fb7a3118e3dbca1ebb1cf6246ce0a7701f09015a5d6a1cb2"
+    }
+  ]
+}

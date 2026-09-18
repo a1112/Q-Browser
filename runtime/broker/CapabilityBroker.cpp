@@ -36,6 +36,11 @@ bool responseFitsIpc(const QString &requestId, const BrokerResult &result)
 
 bool operationAllowed(const QString &capability, const QString &operation)
 {
+    if (capability == QStringLiteral("audio")) {
+        return QStringList{QStringLiteral("catalog"), QStringLiteral("play"),
+            QStringLiteral("pause"), QStringLiteral("stop"), QStringLiteral("seek"),
+            QStringLiteral("setVolume"), QStringLiteral("status")}.contains(operation);
+    }
     if (capability == QStringLiteral("network")) {
         return operation == QStringLiteral("request");
     }
@@ -106,6 +111,9 @@ BrokerResult CapabilityBroker::dispatch(const QString &capability,
     }
 
     CapabilityService *service = nullptr;
+    if (capability == QStringLiteral("audio") && policy_.audioPlayback) {
+        service = services_.audio;
+    }
     if (capability == QStringLiteral("network") && policy_.network.has_value()) {
         service = services_.network;
     } else if (capability == QStringLiteral("storage") && policy_.storage.has_value()) {

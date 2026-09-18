@@ -46,6 +46,7 @@ struct CapabilityServices {
     CapabilityService *storage = nullptr;
     CapabilityService *clipboard = nullptr;
     CapabilityService *file = nullptr;
+    CapabilityService *audio = nullptr;
 };
 
 class CapabilityBroker final

@@ -8,4 +8,5 @@ coverage/
 *.log
 *.user
 CMakeUserPresets.json
+__pycache__/
 

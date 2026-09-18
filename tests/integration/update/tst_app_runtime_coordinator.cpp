@@ -24,12 +24,17 @@ struct CoordinatorHarness final
     QVector<AuthorityDrainBatch> drains;
     std::unique_ptr<AppRuntimeCoordinator> coordinator;
 
-    CoordinatorHarness()
+    CoordinatorHarness(bool multiplePackages = false)
     {
         store = std::make_unique<PackageStore>(
             temporary.filePath(QStringLiteral("store")));
+        auto policy = updateInstallPolicy();
+        if (multiplePackages) {
+            policy.expectedAppId.clear();
+            policy.allowedAppIds = {QStringLiteral("company.pilot"), QStringLiteral("company.elisa"), QStringLiteral("company.tokodon")};
+        }
         installer = std::make_unique<PackageInstaller>(
-            *store, keys.value().publicKeyPem, updateInstallPolicy());
+            *store, keys.value().publicKeyPem, policy);
         coordinator = std::make_unique<AppRuntimeCoordinator>(
             QStringLiteral("company.pilot"), *store, *installer,
             WorkerSupervisionPolicy{100, 1'000}, clock.source(), nullptr,
@@ -128,6 +133,52 @@ class AppRuntimeCoordinatorTest final : public QObject
     Q_OBJECT
 
 private slots:
+    void siteInstallBindsIdentityWithoutReplacingAnchor()
+    {
+        CoordinatorHarness h(true);
+        QCOMPARE(h.coordinator->installAndActivate(h.package("pilot", "1.0.0"), 0).code,
+                 AppRuntimeResultCode::Applied);
+        const auto anchor = h.store->activationState(QStringLiteral("company.pilot"));
+        const auto path = h.package("site", "1.0.0", "company.elisa");
+        QCOMPARE(h.coordinator->installSitePackage(path, "company.tokodon").code,
+                 AppRuntimeResultCode::Rejected);
+        QCOMPARE(h.coordinator->installSitePackage(path, "company.elisa").code,
+                 AppRuntimeResultCode::Applied);
+        QCOMPARE(h.store->activationState(QStringLiteral("company.pilot")).state.current,
+                 anchor.state.current);
+        const auto launch = h.coordinator->requestTabLaunch(tab("site"), "/",
+            TabLaunchIntent::ActivateCurrent, 1, "company.elisa");
+        QCOMPARE(launch.code, AppRuntimeResultCode::Applied);
+        QCOMPARE(onlyAction(launch, AppRuntimeActionKind::Launch).launch->lease.appId,
+                 QStringLiteral("company.elisa"));
+        QCOMPARE(h.coordinator->installSitePackage(path, "company.pilot").code,
+                 AppRuntimeResultCode::Rejected);
+        QFile archive(path);
+        QVERIFY(archive.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        archive.write("tampered");
+        archive.close();
+        QCOMPARE(h.coordinator->installSitePackage(path, "company.elisa").code,
+                 AppRuntimeResultCode::Rejected);
+    }
+    void independentPackageBindingAndMissingPackage()
+    {
+        CoordinatorHarness h(true);
+        QCOMPARE(h.coordinator->installAndActivate(h.package("pilot", "1.0.0"), 0).code, AppRuntimeResultCode::Applied);
+        auto installed = closeImmutablePackageGuard(h.installer->install(h.package("elisa", "1.0.0", "company.elisa")));
+        QVERIFY(installed.succeeded());
+        const auto music = h.coordinator->requestTabLaunch(tab("music"), "/", TabLaunchIntent::ActivateCurrent, 1, "company.elisa");
+        QCOMPARE(music.code, AppRuntimeResultCode::Applied);
+        QCOMPARE(onlyAction(music, AppRuntimeActionKind::Launch).launch->lease.appId, QStringLiteral("company.elisa"));
+        const auto pilot = h.coordinator->requestTabLaunch(tab("pilot"), "/", TabLaunchIntent::ActivateCurrent, 2);
+        QCOMPARE(onlyAction(pilot, AppRuntimeActionKind::Launch).launch->lease.appId, QStringLiteral("company.pilot"));
+        const auto missing = h.coordinator->requestTabLaunch(tab("missing"), "/", TabLaunchIntent::ActivateCurrent, 3, "company.tokodon");
+        QCOMPARE(missing.code, AppRuntimeResultCode::Rejected);
+        QVERIFY(missing.actions.isEmpty());
+        QVERIFY(tamperInstalledEntryPoint(installed.path));
+        const auto corrupt = h.coordinator->requestTabLaunch(tab("corrupt"), "/", TabLaunchIntent::ActivateCurrent, 4, "company.elisa");
+        QCOMPARE(corrupt.code, AppRuntimeResultCode::Rejected);
+        QVERIFY(corrupt.actions.isEmpty());
+    }
     void newTabsUseCandidateWhileExistingTabsRemainPinned();
     void pinnedOldTabRestartsItsPinnedVersion();
     void staleAttemptCleanupFailureFailsClosedAndBlocksInstall();

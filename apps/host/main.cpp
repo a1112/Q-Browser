@@ -37,7 +37,15 @@ int main(int argc, char **argv)
             HostOwnedFileAuthority::openCurrentProcessExecutable();
         return HostRuntimeConfig::fromArguments(arguments, parseContext);
     }();
-    if (!parsed.value.has_value()) return 64;
+    if (!parsed.value.has_value()) {
+        QFile standardError;
+        if (standardError.open(stderr, QIODevice::WriteOnly, QFileDevice::DontCloseHandle)) {
+            (void)standardError.write(QByteArrayLiteral("qbrowser-host configuration failure: ")
+                                     + parsed.stableError.toUtf8() + '\n');
+            (void)standardError.flush();
+        }
+        return 64;
+    }
     recordHostDiagnosticPhase("arguments-parsed");
     int applicationResult = 64;
     {

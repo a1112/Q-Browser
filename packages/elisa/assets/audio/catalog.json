@@ -1,0 +1,20 @@
+[
+  {
+    "id": "morning",
+    "title": "晨光序曲",
+    "artist": "Q-Browser 原创",
+    "album": "清晨来信"
+  },
+  {
+    "id": "rain",
+    "title": "雨后漫步",
+    "artist": "Q-Browser 原创",
+    "album": "雨的记忆"
+  },
+  {
+    "id": "night",
+    "title": "城市夜航",
+    "artist": "Q-Browser 原创",
+    "album": "夜色电台"
+  }
+]

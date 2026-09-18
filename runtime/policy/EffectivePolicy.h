@@ -30,4 +30,5 @@ struct EffectivePolicy {
     std::optional<EffectiveStoragePolicy> storage;
     std::optional<EffectiveClipboardPolicy> clipboard;
     std::optional<EffectiveFilePolicy> file;
+    bool audioPlayback = false;
 };

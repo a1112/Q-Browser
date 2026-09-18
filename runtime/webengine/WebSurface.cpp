@@ -1,5 +1,10 @@
 #include "WebSurface.h"
 
+qint64 WebSurface::renderProcessIdForMonitoring() const noexcept
+{
+    return page_ ? page_->renderProcessPid() : 0;
+}
+
 #include "PilotRequestInterceptor.h"
 #include "WebSessionProfile.h"
 

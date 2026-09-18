@@ -523,8 +523,8 @@ void BrowserSessionStoreTest::rejectsMalformedAndBoundViolations_data()
                           QByteArrayLiteral("[\"app://pilot/home\"]"));
     QTest::newRow("unsupported-address")
         << oneTabDocument(QByteArrayLiteral("New tab"),
-                          QByteArrayLiteral("https://example.test/"),
-                          QByteArrayLiteral("[\"https://example.test/\"]"));
+                          QByteArrayLiteral("file:///secret"),
+                          QByteArrayLiteral("[\"file:///secret\"]"));
     QTest::newRow("empty-history")
         << oneTabDocument(QByteArrayLiteral("New tab"),
                           QByteArrayLiteral("qbrowser://newtab"),
@@ -875,7 +875,7 @@ void BrowserSessionStoreTest::rejectsOneMalformedTabWithoutPartialRecovery()
 #else
     QByteArray bytes = sampleDocument();
     bytes.replace("app://pilot/orders?view=recent",
-                  "https://secret.example/");
+                  "file:///secret");
     StateDirectoryFixture fixture;
     QVERIFY(fixture.authority);
     const BrowserSessionLoadResult result = loadDocument(fixture, bytes);

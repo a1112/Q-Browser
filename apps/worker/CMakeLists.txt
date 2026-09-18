@@ -29,5 +29,5 @@ target_link_libraries(q_browser_worker_app
 q_browser_enable_strict_warnings(q_browser_worker_app)
 
 add_executable(qbrowser-worker WIN32 main.cpp)
-target_link_libraries(qbrowser-worker PRIVATE q_browser_worker_app)
+target_link_libraries(qbrowser-worker PRIVATE q_browser_worker_app Qt6::QuickControls2)
 q_browser_enable_strict_warnings(qbrowser-worker)

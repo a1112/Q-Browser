@@ -46,6 +46,7 @@ struct ManifestPermissions
     bool clipboardWrite = false;
     ClipboardReadPermission clipboardRead = ClipboardReadPermission::Disabled;
     FileOpenPermission fileOpen = FileOpenPermission::Disabled;
+    bool audioPlayback = false;
 };
 
 struct ManifestLimits

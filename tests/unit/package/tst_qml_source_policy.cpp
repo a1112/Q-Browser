@@ -1,12 +1,26 @@
 #include "QmlSourcePolicy.h"
 
 #include <QTest>
+#include <QDirIterator>
+#include <QFile>
 
 class QmlSourcePolicyTest final : public QObject
 {
     Q_OBJECT
 
 private slots:
+    void bundledDemosRespectWorkerSourcePolicy()
+    {
+        QDirIterator files(QStringLiteral(Q_BROWSER_SOURCE_DIR "/packages"), QDir::Files, QDirIterator::Subdirectories);
+        while (files.hasNext()) {
+            const QString path = files.next();
+            if (!QmlSourcePolicy::isQmlSourcePath(path.toUtf8())) continue;
+            QFile file(path);
+            QVERIFY(file.open(QIODevice::ReadOnly));
+            const auto violations = QmlSourcePolicy::violations(file.readAll());
+            QVERIFY2(violations.isEmpty(), qPrintable(path + u':' + violations.join(u',')));
+        }
+    }
     void rejectsDynamicConstructionLoadingAndImports();
     void ignoresCommentsStringsAndStaticComponents();
     void distinguishesRegexAndTemplateExpressions();

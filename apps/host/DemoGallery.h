@@ -18,6 +18,10 @@ public:
     explicit DemoGallery(QWidget *parent = nullptr);
     bool openDemo(const QString &id);
     void showGallery();
+    void setPackageRuntimeEnabled(bool enabled);
+
+signals:
+    void routeRequested(const QString &route);
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
@@ -39,4 +43,5 @@ private:
     QVBoxLayout *detailLayout_ = nullptr;
     QWidget *example_ = nullptr;
     int columns_ = 0;
+    bool packageRuntimeEnabled_ = false;
 };

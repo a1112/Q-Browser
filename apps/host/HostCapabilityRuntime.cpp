@@ -1,4 +1,5 @@
 #include "HostCapabilityRuntime.h"
+#include "AudioBroker.h"
 
 #include "ClipboardBroker.h"
 #include "FileBroker.h"
@@ -101,6 +102,7 @@ HostPolicy hostPolicyFor(const QUrl &mockOrigin)
     host.storage = HostStoragePolicy{1024 * 1024};
     host.clipboard = HostClipboardPolicy{false, true};
     host.file = HostFilePolicy{true, maximumIpcBinaryResultBytes()};
+    host.audioPlayback = true;
     return host;
 }
 }
@@ -250,7 +252,8 @@ std::shared_ptr<HostCapabilityRuntime> HostCapabilityRuntime::create(
     const QString &storageDirectory,
     const quintptr hostWindowId,
     QString *errorCode,
-    FileDialogCoordinator *const fileDialogCoordinator)
+    FileDialogCoordinator *const fileDialogCoordinator,
+    const QString &verifiedPackageDirectory)
 {
     if (!authority.isValid() || admissionToken == nullptr
         || gestureRouter == nullptr || hostWindowId == 0
@@ -269,6 +272,7 @@ std::shared_ptr<HostCapabilityRuntime> HostCapabilityRuntime::create(
             true,
 #endif
             std::move(effective), hostWindowId, fileDialogCoordinator));
+    runtime->verifiedPackageDirectory_ = verifiedPackageDirectory;
     if (!runtime->initialize(storageDirectory, errorCode)) return nullptr;
     if (errorCode != nullptr) errorCode->clear();
     return runtime;
@@ -438,8 +442,11 @@ bool HostCapabilityRuntime::initialize(const QString &storageDirectory,
     if (policy_.file.has_value()) {
         file_ = std::make_unique<FileBroker>(*policy_.file, *fileBackend_);
     }
+    if (policy_.audioPlayback && !verifiedPackageDirectory_.isEmpty()) {
+        audio_ = std::make_unique<AudioBroker>(authority_.appIdentity, verifiedPackageDirectory_);
+    }
     guiBroker_ = std::make_unique<CapabilityBroker>(
-        policy_, CapabilityServices{nullptr, nullptr, clipboard_.get(), nullptr});
+        policy_, CapabilityServices{nullptr, nullptr, clipboard_.get(), nullptr, audio_.get()});
     if (!lane->moveToThread(thread)) {
         if (gestureBindingRegistered_ && gestureRouter_ != nullptr) {
             gestureRouter_->unregisterBinding(authority_);
@@ -791,6 +798,7 @@ void HostCapabilityRuntime::invalidate() noexcept
 {
     if (!accepting_) return;
     accepting_ = false;
+    if (audio_) audio_->shutdown();
     completionSubmitter_ = {};
     if (pendingFile_ != nullptr && pendingFile_->operation.has_value()) {
         (void)pendingFile_->operation->cancellation.cancel();

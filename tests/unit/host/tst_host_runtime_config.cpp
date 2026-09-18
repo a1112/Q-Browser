@@ -252,6 +252,34 @@ class HostRuntimeConfigTest final : public QObject
     Q_OBJECT
 
 private slots:
+    void downloadedPackageUsesRestrictedFileAndSharedStateRoot()
+    {
+#ifdef Q_OS_WIN
+        ValidArguments arguments;
+        const auto directory = HostOwnedStateDirectory::open(arguments.browserState);
+        QVERIFY(directory);
+        qbrowser_archive_detail::WindowsStableDirectoryTree tree;
+        QVERIFY(tree.openSharedRoot(arguments.browserState));
+        const QString path = arguments.browserState + QStringLiteral("/site-test.qapkg");
+        {
+            qbrowser_archive_detail::WindowsStableFile output;
+            QVERIFY(output.createRestrictedOutput(path, tree));
+            QVERIFY(output.writeAll("test", 4));
+            QVERIFY(output.flush());
+        }
+        auto authority = HostOwnedFileAuthority::open(path, true);
+        QVERIFY(authority);
+        QByteArray bytes;
+        QVERIFY(authority->readBounded(8, bytes));
+        QCOMPARE(bytes, QByteArray("test"));
+        QVERIFY(authority->revalidate());
+        QFile writer(path);
+        QVERIFY(!writer.open(QIODevice::WriteOnly));
+        authority.reset();
+        QVERIFY(QFile::remove(path));
+        QVERIFY(directory->revalidate());
+#endif
+    }
     void init();
     void requiresExplicitMode();
     void acceptsOnlyExplicitTrustedShellWithoutPackageAuthority();

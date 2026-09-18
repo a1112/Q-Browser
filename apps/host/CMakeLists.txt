@@ -3,6 +3,10 @@ if(NOT Q_BROWSER_BUILD_WEBENGINE)
 endif()
 
 add_library(q_browser_host STATIC
+  QmlSiteLoader.cpp
+  QmlSiteLoader.h
+  AudioBroker.cpp
+  AudioBroker.h
   AppTabRuntimeController.cpp
   AppTabRuntimeController.h
   BrowserChrome.cpp
@@ -74,6 +78,7 @@ target_link_libraries(q_browser_host
     q_browser_worker_runtime
     Qt6::Core
     Qt6::Widgets)
+target_link_libraries(q_browser_host PRIVATE Qt6::Multimedia)
 
 if(WIN32)
   target_link_libraries(q_browser_host PRIVATE bcrypt dwmapi psapi)

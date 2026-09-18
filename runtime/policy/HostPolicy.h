@@ -62,6 +62,7 @@ public:
     std::optional<HostStoragePolicy> storage;
     std::optional<HostClipboardPolicy> clipboard;
     std::optional<HostFilePolicy> file;
+    bool audioPlayback = false;
 
     [[nodiscard]] static std::optional<HostNetworkPolicy>
     validatedNetwork(const HostNetworkPolicy &candidate);

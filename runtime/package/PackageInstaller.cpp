@@ -425,6 +425,8 @@ InstallResult validateInstalledFiles(
     const QByteArray entryPoint = parsed.hasValue()
         ? parsed.value().entryPoint().toUtf8() : QByteArray{};
     if (!parsed.hasValue() || parsed.value().appId() != appId
+        || (!policy.expectedAppId.isEmpty() && policy.expectedAppId != appId)
+        || (!policy.allowedAppIds.isEmpty() && !policy.allowedAppIds.contains(appId))
         || !runtimeIsCompatible(policy.runtimeVersion, parsed.value().runtime())
         || !importsAreAllowed(parsed.value().imports(), policy.allowedImports)
         || !sourceImportsAreAllowed(files, parsed.value().imports(),
@@ -1269,12 +1271,15 @@ InstallResult PackageInstaller::reverifyPinnedLease(
     return verified;
 }
 
-InstallResult PackageInstaller::install(const QString &packagePath) const
+InstallResult PackageInstaller::install(const QString &packagePath,
+                                       const QString &requiredAppId) const
 {
     const std::optional<QString> authenticatedAppId = authenticatedManifestAppId(
         packagePath, m_trustedPublicKeyPem, m_policy.archiveLimits);
-    if (!m_policy.expectedAppId.isEmpty() && authenticatedAppId.has_value()
-        && *authenticatedAppId != m_policy.expectedAppId) {
+    if (authenticatedAppId.has_value()
+        && ((!requiredAppId.isEmpty() && *authenticatedAppId != requiredAppId)
+            || (!m_policy.expectedAppId.isEmpty() && *authenticatedAppId != m_policy.expectedAppId)
+            || (!m_policy.allowedAppIds.isEmpty() && !m_policy.allowedAppIds.contains(*authenticatedAppId)))) {
         return failure(InstallPhase::Verify, InstallError::AppIdMismatch,
                        QStringLiteral("app_id_mismatch"));
     }
@@ -1382,8 +1387,9 @@ InstallResult PackageInstaller::install(const QString &packagePath) const
                        QStringLiteral("manifest_invalid"));
     }
     const Manifest &manifest = parsed.value();
-    if (!m_policy.expectedAppId.isEmpty()
-        && manifest.appId() != m_policy.expectedAppId) {
+    if ((!requiredAppId.isEmpty() && manifest.appId() != requiredAppId)
+        || (!m_policy.expectedAppId.isEmpty() && manifest.appId() != m_policy.expectedAppId)
+        || (!m_policy.allowedAppIds.isEmpty() && !m_policy.allowedAppIds.contains(manifest.appId()))) {
         return failure(InstallPhase::Verify, InstallError::AppIdMismatch,
                        QStringLiteral("app_id_mismatch"));
     }
