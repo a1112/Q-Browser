@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "units": {
+    "tools-migrator": {
+      "canonical": {
+        "path": "tools/migrator/package.json",
+        "adapter": "json",
+        "pointer": "/version",
+        "format": "semver"
+      },
+      "mirrors": [
+        {
+          "path": "tools/package-lock.json",
+          "adapter": "json",
+          "pointer": "/packages/migrator/version",
+          "format": "semver"
+        }
+      ],
+      "notes": "Existing package manifest authority; independently selected for changes."
+    },
+    "tools-mock-api": {
+      "canonical": {
+        "path": "tools/mock-api/package.json",
+        "adapter": "json",
+        "pointer": "/version",
+        "format": "semver"
+      },
+      "mirrors": [
+        {
+          "path": "tools/package-lock.json",
+          "adapter": "json",
+          "pointer": "/packages/mock-api/version",
+          "format": "semver"
+        }
+      ],
+      "notes": "Existing package manifest authority; independently selected for changes."
+    },
+    "tools": {
+      "canonical": {
+        "path": "tools/package.json",
+        "adapter": "json",
+        "pointer": "/version",
+        "format": "semver"
+      },
+      "mirrors": [
+        {
+          "path": "tools/package-lock.json",
+          "adapter": "json",
+          "pointer": "/packages//version",
+          "format": "semver"
+        },
+        {
+          "path": "tools/package-lock.json",
+          "adapter": "json",
+          "pointer": "/version",
+          "format": "semver"
+        }
+      ],
+      "notes": "Existing package manifest authority; independently selected for changes."
+    },
+    "native": {
+      "canonical": {
+        "path": "CMakeLists.txt",
+        "adapter": "line",
+        "prefix": "project(QBrowser VERSION ",
+        "suffix": " LANGUAGES CXX)",
+        "syntax": "cmake-project",
+        "expected_occurrences": 1,
+        "format": "semver"
+      },
+      "mirrors": [],
+      "notes": "Existing CMake project version; package/update test fixtures retain their independent versions."
+    }
+  },
+  "notes": "Version adoption preserves all existing version numbers and independent units. No tags/releases are created. See VERSIONING.md for exclusions."
+}
