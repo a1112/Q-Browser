@@ -1,63 +1,59 @@
 #include "BrowserWindowGeometry.h"
 
 #include <QSize>
-
 #include <algorithm>
 
 namespace
 {
-constexpr int DefaultWindowWidth = 1280;
-constexpr int DefaultWindowHeight = 800;
-constexpr int MinimumVisibleWidth = 64;
-constexpr int MinimumVisibleHeight = 64;
+constexpr int DefaultWindowWidth = 1100;
+constexpr int DefaultWindowHeight = 720;
 
-QRect centeredDefault(const QRect &availableGeometry)
+QRect safeArea(const QRect &available)
 {
-    const QSize fallbackSize(
-        std::min(DefaultWindowWidth, availableGeometry.width()),
-        std::min(DefaultWindowHeight, availableGeometry.height()));
-    return QRect(
-        availableGeometry.x()
-            + (availableGeometry.width() - fallbackSize.width()) / 2,
-        availableGeometry.y()
-            + (availableGeometry.height() - fallbackSize.height()) / 2,
-        fallbackSize.width(),
-        fallbackSize.height());
+    const int margin = std::min({24, available.width() / 8, available.height() / 8});
+    return available.adjusted(margin, margin, -margin, -margin);
 }
 
-QRect deterministicDefault()
+QRect centeredDefault(const QRect &available)
 {
-    return QRect(0, 0, DefaultWindowWidth, DefaultWindowHeight);
+    const QRect safe = safeArea(available);
+    QRect result(QPoint(), QSize(
+        std::min(DefaultWindowWidth, safe.width() * 4 / 5),
+        std::min(DefaultWindowHeight, safe.height() * 4 / 5)));
+    result.moveCenter(safe.center());
+    return result;
 }
 }
 
 QRect restoreBrowserWindowGeometry(
-    const QRect &persistedGeometry,
-    const QRect &primaryAvailableGeometry,
-    const QList<QRect> &availableScreenGeometries)
+    const QRect &persisted,
+    const QRect &primary,
+    const QList<QRect> &screens)
 {
-    if (persistedGeometry.isValid()) {
-        const bool sufficientlyVisible = std::ranges::any_of(
-            availableScreenGeometries,
-            [&persistedGeometry](const QRect &availableGeometry) {
-                if (!availableGeometry.isValid()) return false;
-                const QRect visible = persistedGeometry.intersected(
-                    availableGeometry);
-                return visible.width() >= MinimumVisibleWidth
-                    && visible.height() >= MinimumVisibleHeight;
-            });
-        if (sufficientlyVisible) return persistedGeometry;
+    QRect target;
+    qint64 largestOverlap = 0;
+    for (const QRect &available : screens) {
+        if (!available.isValid()) continue;
+        if (persisted.isValid() && available.contains(persisted)) return persisted;
+        const QRect overlap = available.intersected(persisted);
+        const qint64 area = qint64(overlap.width()) * overlap.height();
+        if (area > largestOverlap) { target = available; largestOverlap = area; }
     }
+    if (!target.isValid()) {
+        target = primary.isValid() ? primary : QRect();
+        if (!target.isValid()) {
+            const auto first = std::ranges::find_if(screens, [](const QRect &r) { return r.isValid(); });
+            if (first != screens.cend()) target = *first;
+        }
+    }
+    if (!target.isValid()) return QRect(0, 0, DefaultWindowWidth, DefaultWindowHeight);
+    if (!persisted.isValid()) return centeredDefault(target);
 
-    if (primaryAvailableGeometry.isValid()) {
-        return centeredDefault(primaryAvailableGeometry);
-    }
-    const auto firstValidScreen = std::ranges::find_if(
-        availableScreenGeometries,
-        [](const QRect &availableGeometry) {
-            return availableGeometry.isValid();
-        });
-    return firstValidScreen != availableScreenGeometries.cend()
-        ? centeredDefault(*firstValidScreen)
-        : deterministicDefault();
+    // Monitor removal or a smaller work area should not discard the user's size.
+    const QRect safe = safeArea(target);
+    QRect result = persisted;
+    result.setSize(result.size().boundedTo(safe.size()));
+    result.moveLeft(std::clamp(result.left(), safe.left(), safe.right() - result.width() + 1));
+    result.moveTop(std::clamp(result.top(), safe.top(), safe.bottom() - result.height() + 1));
+    return result;
 }
